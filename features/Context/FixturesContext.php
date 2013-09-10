@@ -54,7 +54,7 @@ class FixturesContext extends RawMinkContext
     );
 
     /**
-     * @BeforeScenario
+     * BeforeScenario
      */
     public function resetCurrentLocale()
     {
@@ -64,7 +64,7 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
-     * @BeforeScenario
+     * BeforeScenario
      */
     public function resetChannels()
     {
@@ -76,7 +76,7 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
-     * @BeforeScenario
+     * BeforeScenario
      */
     public function createRequiredAttribute()
     {
@@ -84,7 +84,7 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
-     * @BeforeScenario
+     * BeforeScenario
      */
     public function resetAcl()
     {
@@ -109,7 +109,7 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
-     * @BeforeScenario
+     * BeforeScenario
      */
     public function clearUOW()
     {

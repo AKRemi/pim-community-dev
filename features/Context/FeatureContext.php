@@ -37,11 +37,21 @@ class FeatureContext extends MinkContext implements KernelAwareInterface
     /**
      * @BeforeScenario
      */
+    public function setupDb()
+    {
+        $path = __DIR__."/../../app/Resources/jenkins/behat/akeneo_pim_test.sql";
+        exec ('mysql -u root akeneo_ci_pim_pr_behat < '.$path) ;
+    }
+
+    /**
+     * BeforeScenario
+     */
     public function purgeDatabase()
     {
         $purger = new ORMPurger($this->getEntityManager());
         $purger->purge();
     }
+    /**
 
     /**
      * @AfterScenario
