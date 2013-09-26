@@ -96,6 +96,8 @@ class AppKernel extends Kernel
             $bundles[] = new Sensio\Bundle\GeneratorBundle\SensioGeneratorBundle();
         }
 
+        $bundles[] = new Acme\Bundle\CustomEntityBundle\AcmeCustomEntityBundle();
+
         return $bundles;
     }
 

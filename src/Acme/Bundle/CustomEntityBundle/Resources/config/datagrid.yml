@@ -1,0 +1,11 @@
+parameters:
+    acme_customentity.datagrid.manager.manufacturer.class:      Acme\Bundle\CustomEntity\Datagrid\ManufacturerDatagridManager
+
+services:
+    acme_customentity.datagrid.manager.manufacturer:
+        class: %acme_customentity.datagrid.manager.manufacturer.class%
+        tags:
+            - name:          oro_grid.datagrid.manager
+              datagrid_name: manufacturers
+              entity_hint:   manufacturers
+              route_name:    acme_customentity_manufacturer_index
