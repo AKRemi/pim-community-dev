@@ -85,31 +85,32 @@ class ProductTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetGroups()
     {
-        $groups  = array(
-            $otherGroup   = $this->getGroupMock('Other', -1),
-            $generalGroup = $this->getGroupMock('General', 0),
-            $alphaGroup   = $this->getGroupMock('Alpha', 20),
-            $betaGroup    = $this->getGroupMock('Beta', 10),
+        $groups           = array(
+            $otherGroup   = $this->getGroupMock(1, 'Other', -1),
+            $generalGroup = $this->getGroupMock(2, 'General', 0),
+            $alphaGroup   = $this->getGroupMock(3, 'Alpha', 20),
+            $alphaGroup2  = $this->getGroupMock(3, 'Alpha', 20),
+            $betaGroup    = $this->getGroupMock(4, 'Beta', 10),
         );
 
         foreach ($groups as $group) {
             $this->product->addValue($this->getValueMock($this->getAttributeMock($group)));
         }
 
-        $this->markTestIncomplete('usort(): Array was modified by user comparison function is a false positive');
-
         $groups = $this->product->getOrderedGroups();
         $this->assertSame(4, count($groups));
         $this->assertSame($generalGroup, current($groups));
         $this->assertSame($betaGroup, next($groups));
-        $this->assertSame($alphaGroup, next($groups));
+        $this->assertSame($alphaGroup2, next($groups));
         $this->assertSame($otherGroup, next($groups));
     }
 
     public function testSkuLabel()
     {
-        $this->product->setId(5);
-        $this->assertEquals(5, $this->product->getLabel());
+        $sku = $this->getValueMock($this->getAttributeMock(null, 'pim_catalog_identifier'), 'foo-bar');
+        $this->product->addValue($sku);
+
+        $this->assertEquals('foo-bar', $this->product->getLabel());
     }
 
     public function testAttributeLabel()
@@ -132,11 +133,13 @@ class ProductTest extends \PHPUnit_Framework_TestCase
         $family           = $this->getFamilyMock($attributeAsLabel);
         $value            = $this->getValueMock($attributeAsLabel, null);
 
-        $this->product->setId(25);
+        $sku = $this->getValueMock($this->getAttributeMock(null, 'pim_catalog_identifier'), 'foo-bar');
+        $this->product->addValue($sku);
+
         $this->product->setFamily($family);
         $this->product->addValue($value);
 
-        $this->assertEquals(25, $this->product->getLabel());
+        $this->assertEquals('foo-bar', $this->product->getLabel());
     }
 
     public function testEmptyStringValuedAttributeLabel()
@@ -145,11 +148,13 @@ class ProductTest extends \PHPUnit_Framework_TestCase
         $family           = $this->getFamilyMock($attributeAsLabel);
         $value            = $this->getValueMock($attributeAsLabel, '');
 
-        $this->product->setId(38);
+        $sku = $this->getValueMock($this->getAttributeMock(null, 'pim_catalog_identifier'), 'foo-bar');
+        $this->product->addValue($sku);
+
         $this->product->setFamily($family);
         $this->product->addValue($value);
 
-        $this->assertEquals(38, $this->product->getLabel());
+        $this->assertEquals('foo-bar', $this->product->getLabel());
     }
 
     public function testNullAttributeLabel()
@@ -158,11 +163,13 @@ class ProductTest extends \PHPUnit_Framework_TestCase
         $family    = $this->getFamilyMock(null);
         $value     = $this->getValueMock($attribute, 'bar');
 
-        $this->product->setId(53);
+        $sku = $this->getValueMock($this->getAttributeMock(null, 'pim_catalog_identifier'), 'foo-bar');
+        $this->product->addValue($sku);
+
         $this->product->setFamily($family);
         $this->product->addValue($value);
 
-        $this->assertEquals(53, $this->product->getLabel());
+        $this->assertEquals('foo-bar', $this->product->getLabel());
     }
 
     public function testIsSetEnabled()
@@ -325,9 +332,13 @@ class ProductTest extends \PHPUnit_Framework_TestCase
         return $value;
     }
 
-    private function getGroupMock($name, $sortOrder)
+    private function getGroupMock($id, $name, $sortOrder)
     {
         $group = $this->getMock('Pim\Bundle\CatalogBundle\Entity\AttributeGroup');
+
+        $group->expects($this->any())
+              ->method('getId')
+              ->will($this->returnValue($id));
 
         $group->expects($this->any())
               ->method('getSortOrder')

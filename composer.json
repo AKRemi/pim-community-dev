@@ -17,7 +17,7 @@
     },
     "require": {
         "php": ">=5.3.3",
-        "oro/platform": "dev-maintenance/pim_alpha5",
+        "oro/platform": "dev-maintenance/pim_alpha6",
         "akeneo/DemoBundle": "dev-master",
         "knplabs/knp-gaufrette-bundle": "dev-master",
         "incenteev/composer-parameter-handler": "~2.0"
@@ -29,23 +29,18 @@
         "behat/mink-browserkit-driver":  "*",
         "behat/mink-selenium2-driver":   "*",
         "behat/common-contexts": "*",
-
         "sensiolabs/behat-page-object-extension": "*",
         "kriswallsmith/buzz": ">=0.5"
     },
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:laboro/platform.git",
+            "url": "git@github.com:akeneo/platform.git",
             "branch": "master"
         },
         {
             "type": "vcs",
             "url": "git@github.com:akeneo/DemoBundle.git"
-        },
-        {
-            "type": "vcs",
-            "url": "https://github.com/laboro/SonataAdminBundle.git"
         }
     ],
     "scripts": {

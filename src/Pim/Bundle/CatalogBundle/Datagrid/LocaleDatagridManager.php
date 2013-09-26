@@ -2,13 +2,11 @@
 
 namespace Pim\Bundle\CatalogBundle\Datagrid;
 
-use Oro\Bundle\GridBundle\Action\ActionInterface;
 use Oro\Bundle\GridBundle\Datagrid\DatagridManager;
 use Oro\Bundle\GridBundle\Field\FieldDescription;
 use Oro\Bundle\GridBundle\Field\FieldDescriptionCollection;
 use Oro\Bundle\GridBundle\Field\FieldDescriptionInterface;
 use Oro\Bundle\GridBundle\Filter\FilterInterface;
-use Oro\Bundle\GridBundle\Property\UrlProperty;
 use Oro\Bundle\GridBundle\Property\TwigTemplateProperty;
 
 /**
@@ -20,18 +18,6 @@ use Oro\Bundle\GridBundle\Property\TwigTemplateProperty;
  */
 class LocaleDatagridManager extends DatagridManager
 {
-    /**
-     * get properties
-     * @return array
-     */
-    protected function getProperties()
-    {
-        return array(
-            new UrlProperty('edit_link', $this->router, 'pim_catalog_locale_edit', array('id')),
-            new UrlProperty('disable_link', $this->router, 'pim_catalog_locale_disable', array('id'))
-        );
-    }
-
     /**
      * {@inheritdoc}
      */
@@ -71,49 +57,5 @@ class LocaleDatagridManager extends DatagridManager
             new TwigTemplateProperty($field, 'PimCatalogBundle:Currency:_field_activated.html.twig')
         );
         $fieldsCollection->add($field);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function getRowActions()
-    {
-        $clickAction = array(
-            'name'         => 'rowClick',
-            'type'         => ActionInterface::TYPE_REDIRECT,
-            'acl_resource' => 'root',
-            'options'      => array(
-                'label'         => $this->translate('Edit'),
-                'icon'          => 'edit',
-                'link'          => 'edit_link',
-                'runOnRowClick' => true,
-                'backUrl'       => true
-            )
-        );
-
-        $editAction = array(
-            'name'         => 'edit',
-            'type'         => ActionInterface::TYPE_REDIRECT,
-            'acl_resource' => 'root',
-            'options'      => array(
-                'label'         => $this->translate('Edit'),
-                'icon'          => 'edit',
-                'link'          => 'edit_link',
-                'backUrl'       => true
-            )
-        );
-
-        $disableAction = array(
-            'name'         => 'disable',
-            'type'         => ActionInterface::TYPE_DELETE,
-            'acl_resource' => 'root',
-            'options'      => array(
-                'label' => $this->translate('Disable'),
-                'icon'  => 'trash',
-                'link'  => 'disable_link'
-            )
-        );
-
-        return array($clickAction, $editAction, $disableAction);
     }
 }

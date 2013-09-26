@@ -21,14 +21,14 @@ class Grid extends Index
         parent::__construct($session, $pageFactory, $parameters);
 
         $this->elements = array_merge(
-            $this->elements,
             array(
                 'Grid'           => array('css' => 'table.grid'),
                 'Grid content'   => array('css' => 'table.grid tbody'),
                 'Filters'        => array('css' => 'div.filter-box'),
                 'Grid toolbar'   => array('css' => 'div.grid-toolbar'),
                 'Manage filters' => array('css' => 'div.filter-list')
-            )
+            ),
+            $this->elements
         );
     }
 
@@ -170,6 +170,26 @@ class Grid extends Index
     }
 
     /**
+     * Get the sorted columns
+     * @return Ambigous <\Behat\Mink\Element\Element, unknown, multitype:unknown >
+     */
+    public function getSortedColumns()
+    {
+        $columns = $this->getColumnHeaders(false, false);
+
+        foreach ($columns as $key => $column) {
+            $columnName = $column->getText();
+            if (!$this->isSortedColumn($columnName)) {
+                unset($columns[$key]);
+            } else {
+                $columns[$key] = $columnName;
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
      * Predicate to know if a column is sorted and ordered as we want
      *
      * @param string $column
@@ -189,7 +209,7 @@ class Grid extends Index
      */
     public function countColumns()
     {
-        return count($this->getColumnHeaders());
+        return count($this->getColumnHeaders(false, false));
     }
 
     /**
@@ -316,6 +336,7 @@ class Grid extends Index
     /**
      * Activate a filter
      * @param string $filterName
+     *
      * @throws \InvalidArgumentException
      */
     private function activateFilter($filterName)
@@ -332,6 +353,7 @@ class Grid extends Index
     /**
      * Deactivate filter
      * @param string $filterName
+     *
      * @throws \InvalidArgumentException
      */
     private function deactivateFilter($filterName)
@@ -348,15 +370,16 @@ class Grid extends Index
     /**
      * Click on a filter in filter management list
      * @param string $filterName
+     *
      * @throws \InvalidArgumentException
      */
     private function clickOnFilterToManage($filterName)
     {
         try {
-            $filter = $this
-            ->getElement('Manage filters')
-            ->find('css', sprintf('label:contains("%s")', $filterName))
-            ->click();
+            $this
+                ->getElement('Manage filters')
+                ->find('css', sprintf('label:contains("%s")', $filterName))
+                ->click();
         } catch (\Exception $e) {
             throw new \InvalidArgumentException(
                 sprintf('Impossible to activate filter "%s"', $filterName)
@@ -451,12 +474,22 @@ class Grid extends Index
      * Get column headers
      *
      * @param boolean $withHidden
+     * @param boolean $withActions
      *
      * @return \Behat\Mink\Element\Element
      */
-    protected function getColumnHeaders($withHidden = false)
+    protected function getColumnHeaders($withHidden = false, $withActions = true)
     {
         $headers = $this->getElement('Grid')->findAll('css', 'thead th');
+
+        if (!$withActions) {
+            foreach ($headers as $key => $header) {
+                if ($header->getAttribute('class') === 'action-column'
+                    || $header->getAttribute('class') === 'select-all-header-cell') {
+                    unset($headers[$key]);
+                }
+            }
+        }
 
         if ($withHidden) {
             return $headers;

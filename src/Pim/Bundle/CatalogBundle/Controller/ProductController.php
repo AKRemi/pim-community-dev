@@ -9,25 +9,34 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Validator\ValidatorInterface;
+use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Form\Form;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
+
 use Oro\Bundle\GridBundle\Renderer\GridRenderer;
 use Oro\Bundle\UserBundle\Annotation\Acl;
 use Oro\Bundle\UserBundle\Acl\Manager as AclManager;
+
 use Pim\Bundle\CatalogBundle\Datagrid\DatagridWorkerInterface;
 use Pim\Bundle\CatalogBundle\Form\Handler\ProductCreateHandler;
 use Pim\Bundle\CatalogBundle\Calculator\CompletenessCalculator;
 use Pim\Bundle\CatalogBundle\Manager\ProductManager;
 use Pim\Bundle\CatalogBundle\Manager\CategoryManager;
 use Pim\Bundle\CatalogBundle\Manager\LocaleManager;
-use Pim\Bundle\VersioningBundle\Manager\AuditManager;
 use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
 use Pim\Bundle\CatalogBundle\Model\AvailableProductAttributes;
 use Pim\Bundle\CatalogBundle\Form\Type\AvailableProductAttributesType;
 use Pim\Bundle\CatalogBundle\Entity\Category;
 use Pim\Bundle\CatalogBundle\Helper\CategoryHelper;
+use Pim\Bundle\CatalogBundle\Datagrid\ProductDatagridManager;
+use Pim\Bundle\ImportExportBundle\Normalizer\FlatProductNormalizer;
+use Pim\Bundle\VersioningBundle\Manager\AuditManager;
+use Pim\Bundle\CatalogBundle\Exception\DeleteException;
 
 /**
  * Product Controller
@@ -106,6 +115,11 @@ class ProductController extends AbstractDoctrineController
     private $aclManager;
 
     /**
+     * @staticvar int
+     */
+    const BATCH_SIZE = 250;
+
+    /**
      * Constructor
      *
      * @param Request                  $request
@@ -114,6 +128,7 @@ class ProductController extends AbstractDoctrineController
      * @param SecurityContextInterface $securityContext
      * @param FormFactoryInterface     $formFactory
      * @param ValidatorInterface       $validator
+     * @param TranslatorInterface      $translator
      * @param RegistryInterface        $doctrine
      * @param GridRenderer             $gridRenderer
      * @param DatagridWorkerInterface  $datagridWorker
@@ -133,6 +148,7 @@ class ProductController extends AbstractDoctrineController
         SecurityContextInterface $securityContext,
         FormFactoryInterface $formFactory,
         ValidatorInterface $validator,
+        TranslatorInterface $translator,
         RegistryInterface $doctrine,
         GridRenderer $gridRenderer,
         DatagridWorkerInterface $datagridWorker,
@@ -145,7 +161,16 @@ class ProductController extends AbstractDoctrineController
         AuditManager $auditManager,
         AclManager $aclManager
     ) {
-        parent::__construct($request, $templating, $router, $securityContext, $formFactory, $validator, $doctrine);
+        parent::__construct(
+            $request,
+            $templating,
+            $router,
+            $securityContext,
+            $formFactory,
+            $validator,
+            $translator,
+            $doctrine
+        );
 
         $this->gridRenderer         = $gridRenderer;
         $this->datagridWorker       = $datagridWorker;
@@ -186,17 +211,28 @@ class ProductController extends AbstractDoctrineController
                 $view = 'OroGridBundle:Datagrid:list.json.php';
                 break;
             case 'csv':
-                $content = $datagrid->exportData(
-                    $request->getRequestFormat(),
-                    array('withHeader' => true, 'heterogeneous' => true)
-                );
-                $headers = array(
-                    'Content-Type' => 'text/csv',
-                    'Content-Disposition' =>
-                        sprintf('inline; filename=quick_export_products.%s', $request->getRequestFormat())
+                // Export time execution depends on entities exported
+                ignore_user_abort(false);
+                set_time_limit(0);
+
+                $scope = $this->productManager->getScope();
+
+                $dateTime = new \DateTime();
+                $fileName = sprintf(
+                    'products_export_%s_%s_%s.csv',
+                    $this->getDataLocale(),
+                    $scope,
+                    $dateTime->format('Y-m-d_H:i:s')
                 );
 
-                return $this->returnResponse($content, 200, $headers);
+                // prepare response
+                $response = new StreamedResponse();
+                $attachment = $response->headers->makeDisposition(ResponseHeaderBag::DISPOSITION_INLINE, $fileName);
+                $response->headers->set('Content-Type', 'text/csv');
+                $response->headers->set('Content-Disposition', $attachment);
+                $response->setCallback($this->quickExportCallback($gridManager, $scope, static::BATCH_SIZE));
+
+                return $response->send();
 
                 break;
             case 'html':
@@ -213,6 +249,49 @@ class ProductController extends AbstractDoctrineController
         );
 
         return $this->render($view, $params);
+    }
+
+    /**
+     * Quick export callback
+     *
+     * @param ProductDatagridManager $gridManager
+     * @param string                 $scope
+     * @param integer                $limit
+     *
+     * @return \Closure
+     */
+    protected function quickExportCallback(ProductDatagridManager $gridManager, $scope, $limit)
+    {
+        return function () use ($gridManager, $scope, $limit) {
+            flush();
+
+            $proxyQuery = $gridManager->getDatagrid()->getQueryWithParametersApplied();
+
+            // get attribute lists
+            $fieldsList = $gridManager->getAvailableAttributeCodes($proxyQuery);
+            $fieldsList[] = FlatProductNormalizer::FIELD_FAMILY;
+            $fieldsList[] = FlatProductNormalizer::FIELD_CATEGORY;
+
+            // prepare serializer context
+            $context = array(
+                'withHeader' => true,
+                'heterogeneous' => false,
+                'scope' => $scope,
+                'fields' => $fieldsList
+            );
+
+            // prepare serializer batching
+            $count = $gridManager->getDatagrid()->countResults();
+            $iterations = ceil($count/$limit);
+
+            $gridManager->prepareQueryForExport($proxyQuery, $fieldsList);
+
+            for ($i=0; $i<$iterations; $i++) {
+                $data = $gridManager->getDatagrid()->exportData($proxyQuery, 'csv', $context, $i*$limit, $limit);
+                echo $data;
+                flush();
+            }
+        };
     }
 
     /**
@@ -254,7 +333,7 @@ class ProductController extends AbstractDoctrineController
 
         if ($this->productCreateHandler->process($entity)) {
 
-            $this->addFlash('success', 'Product successfully saved.');
+            $this->addFlash('success', 'flash.product.created');
 
             if ($dataLocale === null) {
                 $dataLocale = $this->getDataLocale();
@@ -326,20 +405,21 @@ class ProductController extends AbstractDoctrineController
                 $categoriesData = $this->getCategoriesData($request->request->all());
                 $categories = $this->categoryManager->getCategoriesByIds($categoriesData['categories']);
 
+                $this->productManager->handleMedia($product);
                 $this->productManager->save($product, $categories, $categoriesData['trees']);
                 // Call completeness calculator after validating data and saving product
                 // so all values for all locale are loaded now
                 $this->calculator->calculateForAProduct($product);
                 $this->productManager->save($product);
 
-                $this->addFlash('success', 'Product successfully saved');
+                $this->addFlash('success', 'flash.product.updated');
 
                 // TODO : Check if the locale exists and is activated
                 $params = array('id' => $product->getId(), 'dataLocale' => $this->getDataLocale());
 
                 return $this->redirectToRoute('pim_catalog_product_edit', $params);
             } else {
-                $this->addFlash('error', 'Please check your entry and try again.');
+                $this->addFlash('error', 'flash.product.invalid');
             }
         }
 
@@ -387,7 +467,7 @@ class ProductController extends AbstractDoctrineController
 
         $this->productManager->save($product);
 
-        $this->addFlash('success', 'Attributes are added to the product form.');
+        $this->addFlash('success', 'flash.product.attributes added');
 
         return $this->redirectToRoute('pim_catalog_product_edit', array('id' => $product->getId()));
     }
@@ -411,7 +491,6 @@ class ProductController extends AbstractDoctrineController
         $product = $this->findProductOr404($id);
         $this->getManager()->remove($product);
         $this->getManager()->flush();
-
         if ($request->isXmlHttpRequest()) {
             return new Response('', 204);
         } else {
@@ -440,21 +519,16 @@ class ProductController extends AbstractDoctrineController
         $product   = $this->findOr404('PimCatalogBundle:Product', $productId);
         $attribute = $this->findOr404('PimCatalogBundle:ProductAttribute', $attributeId);
 
-        if (!$product->isAttributeRemovable($attribute)) {
-            throw $this->createNotFoundException(
-                sprintf(
-                    'Attribute %s can not be removed from the product %s',
-                    $attribute->getCode(),
-                    $product->getCode()
-                )
-            );
+        if ($product->isAttributeRemovable($attribute)) {
+            $this->productManager->removeAttributeFromProduct($product, $attribute);
+        } else {
+            throw new DeleteException($this->getTranslator()->trans('product.attribute not removable'));
         }
-
-        $this->productManager->removeAttributeFromProduct($product, $attribute);
-
-        $this->addFlash('success', 'Attribute was successfully removed.');
-
-        return $this->redirectToRoute('pim_catalog_product_edit', array('id' => $productId));
+        if ($this->getRequest()->isXmlHttpRequest()) {
+            return new Response('', 204);
+        } else {
+            return $this->redirectToRoute('pim_catalog_product_edit', array('id' => $productId));
+        }
     }
 
     /**

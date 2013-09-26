@@ -20,7 +20,7 @@ class ChangeStatusType extends AbstractType
      */
     public function buildForm(FormBuilderInterface $builder, array $options)
     {
-        $builder->add('enable', 'checkbox');
+        $builder->add('toEnable', 'checkbox');
     }
 
     /**
@@ -36,6 +36,9 @@ class ChangeStatusType extends AbstractType
         );
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function getName()
     {
         return 'pim_catalog_mass_change_status';

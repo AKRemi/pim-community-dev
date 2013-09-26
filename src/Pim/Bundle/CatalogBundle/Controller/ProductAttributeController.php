@@ -9,12 +9,16 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Validator\ValidatorInterface;
+use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Form\Form;
+
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
+
 use Oro\Bundle\UserBundle\Annotation\Acl;
 use Oro\Bundle\GridBundle\Renderer\GridRenderer;
+
 use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
 use Pim\Bundle\CatalogBundle\Datagrid\DatagridWorkerInterface;
 use Pim\Bundle\CatalogBundle\Form\Handler\ProductAttributeHandler;
@@ -22,6 +26,7 @@ use Pim\Bundle\CatalogBundle\Manager\LocaleManager;
 use Pim\Bundle\CatalogBundle\Manager\ProductManager;
 use Pim\Bundle\VersioningBundle\Manager\AuditManager;
 use Pim\Bundle\CatalogBundle\Entity\ProductAttribute;
+use Pim\Bundle\CatalogBundle\Exception\DeleteException;
 
 /**
  * Product attribute controller
@@ -88,6 +93,7 @@ class ProductAttributeController extends AbstractDoctrineController
      * @param SecurityContextInterface $securityContext
      * @param FormFactoryInterface     $formFactory
      * @param ValidatorInterface       $validator
+     * @param TranslatorInterface      $translator
      * @param RegistryInterface        $doctrine
      * @param GridRenderer             $gridRenderer
      * @param DatagridWorkerInterface  $datagridWorker
@@ -105,6 +111,7 @@ class ProductAttributeController extends AbstractDoctrineController
         SecurityContextInterface $securityContext,
         FormFactoryInterface $formFactory,
         ValidatorInterface $validator,
+        TranslatorInterface $translator,
         RegistryInterface $doctrine,
         GridRenderer $gridRenderer,
         DatagridWorkerInterface $datagridWorker,
@@ -115,7 +122,16 @@ class ProductAttributeController extends AbstractDoctrineController
         AuditManager $auditManager,
         $measuresConfig
     ) {
-        parent::__construct($request, $templating, $router, $securityContext, $formFactory, $validator, $doctrine);
+        parent::__construct(
+            $request,
+            $templating,
+            $router,
+            $securityContext,
+            $formFactory,
+            $validator,
+            $translator,
+            $doctrine
+        );
 
         $this->gridRenderer     = $gridRenderer;
         $this->datagridWorker   = $datagridWorker;
@@ -129,6 +145,7 @@ class ProductAttributeController extends AbstractDoctrineController
     /**
      * List product attributes
      * @param Request $request
+     *
      * @Acl(
      *      id="pim_catalog_attribute_index",
      *      name="View attribute list",
@@ -167,7 +184,7 @@ class ProductAttributeController extends AbstractDoctrineController
         $attribute = $this->productManager->createAttribute('pim_catalog_text');
 
         if ($this->attributeHandler->process($attribute)) {
-            $this->addFlash('success', 'Attribute successfully created');
+            $this->addFlash('success', 'flash.attribute.created');
 
             return $this->redirectToRoute('pim_catalog_productattribute_edit', array('id' => $attribute->getId()));
         }
@@ -198,7 +215,7 @@ class ProductAttributeController extends AbstractDoctrineController
     public function editAction(Request $request, ProductAttribute $attribute)
     {
         if ($this->attributeHandler->process($attribute)) {
-            $this->addFlash('success', 'Attribute successfully saved');
+            $this->addFlash('success', 'flash.attribute.updated');
 
             return $this->redirectToRoute('pim_catalog_productattribute_edit', array('id' => $attribute->getId()));
         }
@@ -231,6 +248,12 @@ class ProductAttributeController extends AbstractDoctrineController
      * @param Request $request
      *
      * @Template("PimCatalogBundle:ProductAttribute:_form_parameters.html.twig")
+     * @Acl(
+     *      id="pim_catalog_attribute_preprocess",
+     *      name="Preprocess an attribute",
+     *      description="Preprocess an attribute",
+     *      parent="pim_catalog_attribute"
+     * )
      * @return array
      */
     public function preProcessAction(Request $request)
@@ -273,6 +296,7 @@ class ProductAttributeController extends AbstractDoctrineController
      * Edit ProductAttribute sort order
      *
      * @param Request $request
+     *
      * @Acl(
      *      id="pim_catalog_attribute_sort",
      *      name="Sort attribute options",
@@ -311,13 +335,20 @@ class ProductAttributeController extends AbstractDoctrineController
      * @param Request          $request
      * @param ProductAttribute $entity
      *
+     * @Acl(
+     *      id="pim_catalog_attribute_remove",
+     *      name="Remove attribute",
+     *      description="Remove attribute",
+     *      parent="pim_catalog_attribute"
+     * )
+     *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse|Response
      */
     public function removeAction(Request $request, ProductAttribute $entity)
     {
         if ($entity->getAttributeType() === 'pim_catalog_identifier') {
             if ($request->isXmlHttpRequest()) {
-                return new Response('', 403);
+                throw new DeleteException($this->getTranslator()->trans('flash.attribute.identifier not removable'));
             } else {
                 return $this->redirectToRoute('pim_catalog_productattribute_index');
             }

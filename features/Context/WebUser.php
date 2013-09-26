@@ -5,7 +5,6 @@ namespace Context;
 use Behat\MinkExtension\Context\RawMinkContext;
 use Behat\Mink\Exception\ExpectationException;
 use Behat\Gherkin\Node\TableNode;
-use Behat\Behat\Exception\PendingException;
 use Behat\Mink\Exception\UnsupportedDriverActionException;
 use Behat\Behat\Context\Step;
 use SensioLabs\Behat\PageObjectExtension\Context\PageObjectAwareInterface;
@@ -29,6 +28,10 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
 
     private $password = null;
 
+    private $windowWidth;
+
+    private $windowHeight;
+
     private $pageMapping = array(
         'attributes'  => 'Attribute index',
         'channels'    => 'Channel index',
@@ -45,7 +48,29 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
         'home'        => 'Base index',
     );
 
+    /**
+     * Constructor
+     *
+     * @param integer $windowWidth
+     * @param integer $windowHeight
+     */
+    public function __construct($windowWidth, $windowHeight)
+    {
+        $this->windowWidth  = $windowWidth;
+        $this->windowHeight = $windowHeight;
+    }
     /* -------------------- Page-related methods -------------------- */
+
+    /**
+     * @BeforeStep
+     */
+    public function maximize()
+    {
+        try {
+            $this->getSession()->resizeWindow($this->windowWidth, $this->windowHeight);
+        } catch (UnsupportedDriverActionException $e) {
+        }
+    }
 
     /**
      * @BeforeScenario
@@ -169,7 +194,10 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
             $currentUrl = explode('#url=', $currentUrl);
             $currentUrl = end($currentUrl);
 
-            assertEquals($url, $currentUrl, sprintf('Error ocurred on page "%s"', $data['page']));
+            assertTrue(
+                (bool) (($url === $currentUrl) || ($url ."|g/" === $currentUrl)),
+                sprintf('Error ocurred on page "%s"', $data['page'])
+            );
 
             $loadedCorrectly = (bool) $this->getSession()->evaluateScript('return $(\'img[alt="Akeneo"]\').length;');
             assertTrue($loadedCorrectly, sprintf('Javascript error ocurred on page "%s"', $data['page']));
@@ -778,6 +806,7 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
 
         $link->click();
         $this->getSession()->getPage()->clickLink('OK');
+        $this->wait();
     }
 
     /**
@@ -1062,6 +1091,7 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
     public function iDisableTheProducts()
     {
         $this->getPage('Batch ChangeStatus')->disableProducts()->next();
+        $this->getPage('Batch ChangeStatus')->confirm();
         $this->wait();
     }
 
@@ -1079,6 +1109,7 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
     public function iEnableTheProducts()
     {
         $this->getPage('Batch ChangeStatus')->enableProducts()->next();
+        $this->getPage('Batch ChangeStatus')->confirm();
         $this->wait();
     }
 
@@ -1108,6 +1139,26 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
         if (!$product->isEnabled()) {
             throw $this->createExpectationException('Product was expected to be be enabled');
         }
+    }
+
+    /**
+     * @param string      $sku
+     * @param string|null $expectedFamily
+     *
+     * @Then /^the product "([^"]*)" should have no family$/
+     * @Then /^the family of (?:the )?product "([^"]*)" should be "([^"]*)"$/
+     */
+    public function theFamilyOfProductShouldBe($sku, $expectedFamily = '')
+    {
+        $product = $this->getProduct($sku);
+        $this->getMainContext()->getEntityManager()->refresh($product);
+
+        $actualFamily = $product->getFamily() ? $product->getFamily()->getCode() : '';
+        assertEquals(
+            $expectedFamily,
+            $actualFamily,
+            sprintf('Expecting the family of "%s" to be "%s", not "%s".', $sku, $expectedFamily, $actualFamily)
+        );
     }
 
     /**
@@ -1145,61 +1196,6 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
         if ((int) $count !== $countUpdates = $this->getPage('Product edit')->countUpdates()) {
             throw $this->createExpectationException(sprintf('Expected %d updates, saw %d.', $count, $countUpdates));
         }
-    }
-
-    /**
-     * @param string $code
-     *
-     * @Given /^I filter per category "([^"]*)"$/
-     */
-    public function iFilterPerCategory($code)
-    {
-        $category = $this->getCategory($code);
-        $this->getPage('Product index')->clickCategoryFilterLink($category);
-        $this->wait();
-    }
-
-    /**
-     * @param string $value
-     * @param string $currency
-     *
-     * @When /^I filter per price with value "([^"]*)" and currency "([^"]*)"$/
-     */
-    public function iFilterPerPrice($value, $currency)
-    {
-        $this->getPage('Product index')->filterPerPrice($value, $currency);
-        $this->wait();
-    }
-
-    /**
-     * @Given /^I filter per unclassified category$/
-     */
-    public function iFilterPerUnclassifiedCategory()
-    {
-        $this->getPage('Product index')->clickUnclassifiedCategoryFilterLink();
-        $this->wait();
-    }
-
-    /**
-     * @param string $code
-     *
-     * @Given /^I filter per family ([^"]*)$/
-     */
-    public function iFilterPerFamily($code)
-    {
-        $this->getPage('Product index')->filterPerFamily($code);
-        $this->wait();
-    }
-
-    /**
-     * @param string $code
-     *
-     * @Given /^I filter per channel ([^"]*)$/
-     */
-    public function iFilterPerChannel($code)
-    {
-        $this->getPage('Product index')->filterPerChannel($code);
-        $this->wait();
     }
 
     /**
@@ -1592,10 +1588,17 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
      */
     public function iShouldSeeTheUploadedImage()
     {
-        $this->wait(3000, '');
-        if (!$this->getPage('Product edit')->getImagePreview()) {
-            throw $this->createExpectationException('Image preview is not displayed.');
+        $maxTime = 10000;
+
+        while ($maxTime > 0) {
+            $this->wait(1000, false);
+            $maxTime -= 1000;
+            if ($this->getPage('Product edit')->getImagePreview()) {
+                return;
+            }
         }
+
+        throw $this->createExpectationException('Image preview is not displayed.');
     }
 
     /**
@@ -1771,7 +1774,7 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
             ->chooseOperation($operation)
             ->next();
 
-        $this->wait();
+        $this->wait(10000);
     }
 
     /**
@@ -1784,6 +1787,37 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
         if (!$this->getCurrentPage()->findTooltip($text)) {
             throw $this->createExpectationException(sprintf('No tooltip containing "%s" were found.', $text));
         }
+    }
+
+    /**
+     * @param string $fields
+     *
+     * @Given /^I display the (.*) attribute$/
+     */
+    public function iDisplayTheNameAttribute($fields)
+    {
+        $this->getCurrentPage()->addAvailableAttributes($this->listToArray($fields));
+        $this->wait();
+    }
+
+    /**
+     * @Given /^I move on to the next step$/
+     */
+    public function iMoveOnToTheNextStep()
+    {
+        $this->scrollContainerTo(900);
+        $this->getCurrentPage()->next();
+        $this->scrollContainerTo(900);
+        $this->getCurrentPage()->confirm();
+        $this->wait(10000);
+    }
+
+    /**
+     * @param integer $y
+     */
+    private function scrollContainerTo($y)
+    {
+        $this->getSession()->executeScript(sprintf('$(".scrollable-container").scrollTop(%d);', $y));
     }
 
     /**
@@ -1879,8 +1913,15 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
      *
      * @return void
      */
-    private function wait($time = 4000, $condition = 'document.readyState == "complete" && !$.active')
+    private function wait($time = 5000, $condition = null)
     {
+        $condition = $condition ?: <<<JS
+        document.readyState == "complete"                   // Page is ready
+            && !$.active                                    // No ajax request is active
+            && $("#page").css("display") == "block"         // Page is displayed (no yellow progress bar)
+            && $(".loading-mask").css("display") == "none"; // Page is not loading (no black mask loading page)
+JS;
+
         try {
             return $this->getMainContext()->wait($time, $condition);
         } catch (UnsupportedDriverActionException $e) {
@@ -1912,7 +1953,7 @@ class WebUser extends RawMinkContext implements PageObjectAwareInterface
      *
      * @return Category
      */
-    private function getCategory($code)
+    public function getCategory($code)
     {
         return $this->getFixturesContext()->getCategory($code);
     }

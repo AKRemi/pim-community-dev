@@ -1,11 +1,11 @@
 <div class="progress-cell">
 {% if product.getFamily is null %}
-    {{ 'Waiting for calculation' | trans }}
+    {{ 'Waiting for calculation'|trans }}
 {% elseif completeness is null %}
-    {{ 'Not yet calculated' | trans }}
+    {{ 'Not yet calculated'|trans }}
 {% else %}
-    {% set titleProgressBar = completeness.ratio|number_format(0) ~'% completed ('~ completeness.requiredCount ~' required values)' %}
-    <div class="progress" title="{{ titleProgressBar }}">
+    {% set titleProgressBar = completeness.ratio|number_format(0) ~ '% ' ~ 'complete'|trans ~ ' (' ~ completeness.requiredCount ~ ' ' ~ 'required values'|trans ~ ')' %}
+    <div class="progress" data-toggle="tooltip" data-original-title="{{ titleProgressBar }}">
         {% if channel.hasLocale(locale) == false %}
             {% set progressClass = 'bar-disabled' %}
         {% elseif completeness.ratio == 100 %}
@@ -19,14 +19,14 @@
     </div>
 
     {% if completeness.missingCount == 0 %}
-        <div class="center">{{ 'Complete' | trans }}</div>
+        <div class="center">{{ 'Complete'|trans }}</div>
     {% else %}
-        {% set titleMissing = "Missing attributes :"|trans %}
+        {% set titleMissing = '' %}
         {% for attribute in completeness.missingAttributes %}
-            {% set titleMissing = titleMissing ~'&#013; - '~ attribute.label  %}
+            {% set titleMissing = titleMissing ~ '- ' ~ attribute.label ~ (loop.last ? '' : '</br>') %}
         {% endfor %}
-        <div class="center" title="{{ titleMissing|raw }}">
-            <span class="progress-info">{{ completeness.missingCount }} missing values</span>
+        <div class="center" data-toggle="popover" data-placement="bottom" data-html="true" data-trigger="hover" data-original-title="{{ 'missing values'|trans|capitalize }}:" data-content="{{ titleMissing|raw }}">
+            <span class="progress-info">{{ completeness.missingCount }} {{ 'missing values'|trans }}</span>
         </div>
     {% endif %}
 

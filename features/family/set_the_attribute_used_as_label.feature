@@ -23,7 +23,7 @@ Feature: Set the attribute used as label
     Given I am logged in as "admin"
     When I am on the "Bags" family page
     And I choose "Brand" as the label of the family
-    Then I should see "Family successfully updated."
+    Then I should see "Family successfully updated"
 
   Scenario: Succesfully display the chosen attribute as the title of the product
     Given the attribute "Brand" has been chosen as the family "Bags" label
@@ -35,7 +35,7 @@ Feature: Set the attribute used as label
       | bag-jean | Brand     | Levis |
     And I am logged in as "admin"
     When I am on the "bag-jean" product page
-    Then the title of the product should be "Products/en Levis"
+    Then the title of the product should be "Product/en Levis"
 
   Scenario: Succesfully display the id as the title of the product
     Given the following products:
@@ -43,7 +43,7 @@ Feature: Set the attribute used as label
       | bag-jean |
     And I am logged in as "admin"
     When I am on the "bag-jean" product page
-    Then the title of the product should match "#^Products/en \d+$#"
+    Then the title of the product should be "Product/en bag-jean"
 
   @javascript
   Scenario: Fail to remove an attribute that is used as the family label
@@ -52,4 +52,4 @@ Feature: Set the attribute used as label
     When I am on the "Bags" family page
     And I visit the "Attributes" tab
     And I remove the "Brand" attribute
-    Then I should see "You cannot remove this attribute because it is used as label for the family."
+    Then I should see "This attribute can not be removed because it is used as the label of the family"

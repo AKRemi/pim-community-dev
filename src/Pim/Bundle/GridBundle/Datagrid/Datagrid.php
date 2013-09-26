@@ -23,7 +23,7 @@ class Datagrid extends OroDatagrid
     protected $serializer;
 
     /**
-     * @var array
+     * @var ExportActionInterface[]
      */
     protected $exportActions = array();
 
@@ -38,6 +38,7 @@ class Datagrid extends OroDatagrid
 
     /**
      * Get list of export actions
+     *
      * @return ExportActionInterface[]
      */
     public function getExportActions()
@@ -60,35 +61,62 @@ class Datagrid extends OroDatagrid
     }
 
     /**
-     * Serialize datagrid results in a specific format and with a specific context
-     * @param string $format
-     * @param array  $context
+     * Returns the results count of the query
      *
-     * @return string
+     * @return integer
      */
-    public function exportData($format, array $context = array())
+    public function countResults()
     {
-        return $this->serializer->serialize(
-            $this->getResultsWithoutPaging(),
-            $format,
-            $context
-        );
+        $this->applyParameters();
+        $proxyQuery = clone $this->query;
+
+        $exprFieldId = sprintf('%s.id', $proxyQuery->getRootAlias());
+        $proxyQuery
+            ->select($exprFieldId)
+            ->groupBy($exprFieldId)
+            ->resetDQLPart('orderBy')
+            ->setFirstResult(null)
+            ->setMaxResults(null);
+
+        return count($proxyQuery->execute());
     }
 
     /**
-     * Get query result without pagination
+     * Returns the query with parameters applied
      *
-     * @return \Doctrine\Common\Collections\ArrayCollection
+     * @return \Oro\Bundle\GridBundle\Datagrid\ProxyQueryInterface
      */
-    public function getResultsWithoutPaging()
+    public function getQueryWithParametersApplied()
     {
-        $this->pagerApplied = true;
         $this->applyParameters();
 
-        // allow to get all the columns
-        $this->query->select($this->query->getRootAlias());
+        return $this->query;
+    }
 
-        return $this->getQuery()->execute();
+    /**
+     * Serialize datagrid results in a specific format and with a specific context
+     * Offset and limit allow to batch the export result and streamed the response if needed
+     *
+     * @param ProxyQueryInterface $proxyQuery
+     * @param string              $format
+     * @param array               $context
+     * @param int                 $offset
+     * @param int                 $limit
+     *
+     * @return string
+     */
+    public function exportData($proxyQuery, $format, array $context = array(), $offset = null, $limit = null)
+    {
+        $proxyQuery
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        $results = $proxyQuery->execute();
+        $data = $this->serializer->serialize($results, $format, $context);
+
+        $proxyQuery->getEntityManager()->clear();
+
+        return $data;
     }
 
     /**

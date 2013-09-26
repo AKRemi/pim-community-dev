@@ -4,6 +4,7 @@ namespace Pim\Bundle\ImportExportBundle\Converter;
 
 use Doctrine\ORM\EntityManager;
 use Pim\Bundle\CatalogBundle\Entity\ProductAttribute;
+use Pim\Bundle\CatalogBundle\Manager\CurrencyManager;
 
 /**
  * Convert a basic representation of a value into a complex one bindable on a product form
@@ -16,13 +17,33 @@ class ProductValueConverter
 {
     const SCOPE_KEY = '[scope]';
 
+    /**
+     * @var EntityManager $entityManager
+     */
     protected $entityManager;
 
-    public function __construct(EntityManager $entityManager)
+    /**
+     * @var CurrencyManager $currencyManager
+     */
+    protected $currencyManager;
+
+    /**
+     * Constructor
+     *
+     * @param EntityManager   $entityManager
+     * @param CurrencyManager $currencyManager
+     */
+    public function __construct(EntityManager $entityManager, CurrencyManager $currencyManager)
     {
-        $this->entityManager = $entityManager;
+        $this->entityManager   = $entityManager;
+        $this->currencyManager = $currencyManager;
     }
 
+    /**
+     * @param array $data
+     *
+     * @return array
+     */
     public function convert($data)
     {
         $scope = $this->getScope($data);
@@ -30,7 +51,9 @@ class ProductValueConverter
         $result = array();
         foreach ($data as $key => $value) {
             $attribute = $this->getAttribute($key);
-            if ($attribute) {
+
+            // TODO Handle media import
+            if ($attribute && 'media' !== $attribute->getBackendType()) {
                 switch ($attribute->getBackendType()) {
                     case 'prices':
                         $value = $this->convertPricesValue($value);
@@ -43,6 +66,9 @@ class ProductValueConverter
                         break;
                     case 'options':
                         $value = $this->convertOptionsValue($value);
+                        break;
+                    case 'metric':
+                        $value = $this->convertMetricValue($value);
                         break;
                     default:
                         $value = $this->convertValue($attribute->getBackendType(), $value);
@@ -69,12 +95,21 @@ class ProductValueConverter
     private function convertPricesValue($value)
     {
         $result = array();
-        foreach (explode(',', $value) as $price) {
-            list($data, $currency) = explode(' ', $price);
-            $result[] = array(
-                'data'     => $data,
-                'currency' => $currency,
-            );
+        if (strpos($value, ',') !== false) {
+            foreach (explode(',', $value) as $price) {
+                list($data, $currency) = explode(' ', $price);
+                $result[] = array(
+                    'data'     => $data,
+                    'currency' => $currency,
+                );
+            }
+        } else {
+            foreach ($this->currencyManager->getActiveCodes() as $currency) {
+                $result[] = array(
+                    'data'     => '',
+                    'currency' => $currency,
+                );
+            }
         }
 
         return $this->convertValue('prices', $result);
@@ -115,7 +150,7 @@ class ProductValueConverter
      *
      * @return array
      */
-    public function convertOptionsValue($value)
+    private function convertOptionsValue($value)
     {
         $options = array();
         foreach (explode(',', $value) as $val) {
@@ -128,9 +163,37 @@ class ProductValueConverter
     }
 
     /**
-     * Convert value
+     * Convert metric value
      *
      * @param string $value
+     *
+     * @return array
+     */
+    public function convertMetricValue($value)
+    {
+        if (empty($value)) {
+            $metric = array();
+        } else {
+            if (false === strpos($value, ' ')) {
+                throw new \InvalidArgumentException(
+                    sprintf('Metric value "%s" is malformed, must match "<data> <unit>"', $value)
+                );
+            }
+            list($data, $unit) = explode(' ', $value);
+            $metric = array(
+                'data' => $data,
+                'unit' => $unit,
+            );
+        }
+
+        return $this->convertValue('metric', $metric);
+    }
+
+    /**
+     * Convert value
+     *
+     * @param string $type
+     * @param mixed  $value
      *
      * @return array
      */
@@ -156,6 +219,13 @@ class ProductValueConverter
         }
     }
 
+    /**
+     * Get ProductAttribute entity by code
+     *
+     * @param string $code
+     *
+     * @return ProductAttribute
+     */
     private function getAttribute($code)
     {
         if ($this->isLocalized($code)) {
@@ -167,7 +237,14 @@ class ProductValueConverter
             ->findOneBy(array('code' => $code));
     }
 
-    public function getOption($code)
+    /**
+     * Get AttributeOption entity by code
+     *
+     * @param string $code
+     *
+     * @return AttributeOption
+     */
+    private function getOption($code)
     {
         return $this->entityManager
             ->getRepository('PimCatalogBundle:AttributeOption')

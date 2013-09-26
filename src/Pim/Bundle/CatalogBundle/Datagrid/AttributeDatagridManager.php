@@ -122,7 +122,13 @@ class AttributeDatagridManager extends DatagridManager
         $field = $this->createGroupField();
         $fieldsCollection->add($field);
     }
-
+    /**
+     * @inheritdoc
+     */
+    public function getIdentifierField()
+    {
+        return 'id';
+    }
     /**
      * Create attribute type field description for datagrid
      *
@@ -190,19 +196,6 @@ class AttributeDatagridManager extends DatagridManager
      */
     protected function getRowActions()
     {
-        $clickAction = array(
-            'name'         => 'rowClick',
-            'type'         => ActionInterface::TYPE_REDIRECT,
-            'acl_resource' => 'root',
-            'options'      => array(
-                'label'         => $this->translate('Edit'),
-                'icon'          => 'edit',
-                'link'          => 'edit_link',
-                'runOnRowClick' => true,
-                'backUrl'       => true
-            )
-        );
-
         $editAction = array(
             'name'         => 'edit',
             'type'         => ActionInterface::TYPE_REDIRECT,
@@ -210,10 +203,13 @@ class AttributeDatagridManager extends DatagridManager
             'options'      => array(
                 'label'   => $this->translate('Edit'),
                 'icon'    => 'edit',
-                'link'    => 'edit_link',
-                'backUrl' => true
+                'link'    => 'edit_link'
             )
         );
+
+        $clickAction = $editAction;
+        $clickAction['name'] = 'rowClick';
+        $clickAction['options']['runOnRowClick'] = true;
 
         $deleteAction = array(
             'name'         => 'delete',
@@ -222,8 +218,7 @@ class AttributeDatagridManager extends DatagridManager
             'options'      => array(
                 'label'   => $this->translate('Delete'),
                 'icon'    => 'trash',
-                'link'    => 'delete_link',
-                'backUrl' => true
+                'link'    => 'delete_link'
             )
         );
 
@@ -239,7 +234,7 @@ class AttributeDatagridManager extends DatagridManager
     {
         $translator = $this->translator;
         $attributeTypes = $this->productManager->getAttributeTypes();
-        $fieldOptions = array_combine($attributeTypes, $attributeTypes);
+        $fieldOptions = empty($attributeTypes) ? array() : array_combine($attributeTypes, $attributeTypes);
         $fieldOptions = array_map(
             function ($type) use ($translator) {
                 return $translator->trans($type);

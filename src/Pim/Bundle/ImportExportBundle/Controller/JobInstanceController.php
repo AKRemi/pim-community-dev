@@ -2,7 +2,7 @@
 
 namespace Pim\Bundle\ImportExportBundle\Controller;
 
-use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
+use Symfony\Component\Process\Process;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Bundle\FrameworkBundle\Templating\EngineInterface;
 use Symfony\Component\Security\Core\SecurityContextInterface;
@@ -10,17 +10,19 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Validator\ValidatorInterface;
-use Pim\Bundle\CatalogBundle\Datagrid\DatagridWorkerInterface;
-use Oro\Bundle\BatchBundle\Connector\ConnectorRegistry;
-
-use Pim\Bundle\CatalogBundle\Form\Type\UploadType;
+use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Pim\Bundle\ImportExportBundle\Form\Type\JobInstanceType;
+
+use Oro\Bundle\BatchBundle\Connector\ConnectorRegistry;
 use Oro\Bundle\BatchBundle\Entity\JobInstance;
 use Oro\Bundle\BatchBundle\Entity\JobExecution;
-use Oro\Bundle\BatchBundle\Job\ExitStatus;
 use Oro\Bundle\BatchBundle\Item\UploadedFileAwareInterface;
+
+use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
+use Pim\Bundle\CatalogBundle\Datagrid\DatagridWorkerInterface;
+use Pim\Bundle\CatalogBundle\Form\Type\UploadType;
+use Pim\Bundle\ImportExportBundle\Form\Type\JobInstanceType;
 
 /**
  * Job Instance controller
@@ -31,10 +33,48 @@ use Oro\Bundle\BatchBundle\Item\UploadedFileAwareInterface;
  */
 class JobInstanceController extends AbstractDoctrineController
 {
+    /**
+     * @var DatagridWorkerInterface
+     */
     private $datagridWorker;
+
+    /**
+     * @var ConnectorRegistry
+     */
     private $connectorRegistry;
+
+    /**
+     * @var string
+     */
     private $jobType;
 
+    /**
+     * @var string
+     */
+    private $rootDir;
+
+    /**
+     * @var string
+     */
+    private $environment;
+
+    /**
+     * Constructor
+     *
+     * @param Request                  $request
+     * @param EngineInterface          $templating
+     * @param RouterInterface          $router
+     * @param SecurityContextInterface $securityContext
+     * @param FormFactoryInterface     $formFactory
+     * @param ValidatorInterface       $validator
+     * @param TranslatorInterface      $translator
+     * @param RegistryInterface        $doctrine
+     * @param DatagridWorkerInterface  $datagridWorker
+     * @param ConnectorRegistry        $connectorRegistry
+     * @param string                   $jobType
+     * @param string                   $rootDir
+     * @param string                   $environment
+     */
     public function __construct(
         Request $request,
         EngineInterface $templating,
@@ -42,16 +82,30 @@ class JobInstanceController extends AbstractDoctrineController
         SecurityContextInterface $securityContext,
         FormFactoryInterface $formFactory,
         ValidatorInterface $validator,
+        TranslatorInterface $translator,
         RegistryInterface $doctrine,
         DatagridWorkerInterface $datagridWorker,
         ConnectorRegistry $connectorRegistry,
-        $jobType
+        $jobType,
+        $rootDir,
+        $environment
     ) {
-        parent::__construct($request, $templating, $router, $securityContext, $formFactory, $validator, $doctrine);
+        parent::__construct(
+            $request,
+            $templating,
+            $router,
+            $securityContext,
+            $formFactory,
+            $validator,
+            $translator,
+            $doctrine
+        );
 
         $this->datagridWorker    = $datagridWorker;
         $this->connectorRegistry = $connectorRegistry;
         $this->jobType           = $jobType;
+        $this->rootDir           = $rootDir;
+        $this->environment       = $environment;
     }
     /**
      * List the jobs instances
@@ -227,9 +281,11 @@ class JobInstanceController extends AbstractDoctrineController
         try {
             $jobInstance = $this->getJobInstance($id);
         } catch (NotFoundHttpException $e) {
-            $this->addFlash('error', $e->getMessage());
-
-            return $this->redirectToIndexView();
+            if ($request->isXmlHttpRequest()) {
+                return new Response('', 404);
+            } else {
+                return $this->redirectToIndexView();
+            }
         }
 
         $this->getManager()->remove($jobInstance);
@@ -238,8 +294,6 @@ class JobInstanceController extends AbstractDoctrineController
         if ($request->isXmlHttpRequest()) {
             return new Response('', 204);
         } else {
-            $this->addFlash('success', sprintf('The %s has been successfully removed', $this->getJobType()));
-
             return $this->redirectToIndexView();
         }
     }
@@ -270,6 +324,7 @@ class JobInstanceController extends AbstractDoctrineController
             $jobExecution->setJobInstance($jobInstance);
             $job = $jobInstance->getJob();
 
+            $uploadMode = false;
             if ($request->isMethod('POST') && count($uploadViolations) === 0) {
                 $form = $this->createUploadForm();
                 $form->handleRequest($request);
@@ -294,21 +349,37 @@ class JobInstanceController extends AbstractDoctrineController
                             }
 
                             $reader->setUploadedFile($file);
+                            $uploadMode = true;
                         }
                     }
                 }
             }
 
-            $job->execute($jobExecution);
+            if ($uploadMode) {
+                $job->execute($jobExecution);
 
-            if (ExitStatus::COMPLETED === $jobExecution->getExitStatus()->getExitCode()) {
-                $this->addFlash('success', sprintf('The %s has been successfully executed.', $this->getJobType()));
             } else {
-                $this->addFlash('error', sprintf('An error occured during the %s execution.', $this->getJobType()));
+                $this->getManager()->persist($jobExecution);
+                $this->getManager()->flush();
+                $instanceCode = $jobExecution->getJobInstance()->getCode();
+                $executionId = $jobExecution->getId();
+                $cmd = sprintf(
+                    'php %s/console oro:batch:job --env=%s %s %s >> %s/logs/batch_execute.log 2>&1',
+                    $this->rootDir,
+                    $this->environment,
+                    $instanceCode,
+                    $executionId,
+                    $this->rootDir
+                );
+                $process = new Process($cmd);
+                $process->start();
             }
+            $this->addFlash('success', sprintf('The %s is running.', $this->getJobType()));
+
+            return $this->redirectToReportView($jobExecution->getId());
         }
 
-        return $this->redirectToReportView($jobExecution->getId());
+        return $this->redirectToShowView($jobInstance->getId());
     }
 
     /**

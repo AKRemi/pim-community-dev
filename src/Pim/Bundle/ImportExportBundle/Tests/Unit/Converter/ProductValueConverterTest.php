@@ -28,8 +28,9 @@ class ProductValueConverterTest extends \PHPUnit_Framework_TestCase
                     )
                 )
             );
+        $currencyManager = $this->getCurrencyManagerMock();
 
-        $this->converter = new ProductValueConverter($em);
+        $this->converter = new ProductValueConverter($em, $currencyManager);
     }
 
     public function testConvertBasicType()
@@ -131,6 +132,35 @@ class ProductValueConverterTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testConvertEmptyPricesValue()
+    {
+        $this->attributeRepository
+            ->expects($this->any())
+            ->method('findOneBy')
+            ->with(array('code' => 'public_prices'))
+            ->will($this->returnValue($this->getAttributeMock('prices')));
+
+        $this->assertEquals(
+            array(
+                'values' => array(
+                    'public_prices' => array(
+                        'prices' => array(
+                            array(
+                                'data'     => '',
+                                'currency' => 'EUR',
+                            ),
+                            array(
+                                'data'     => '',
+                                'currency' => 'USD',
+                            )
+                        ),
+                    )
+                )
+            ),
+            $this->converter->convert(array('public_prices' => ''))
+        );
+    }
+
     public function testConvertDateValue()
     {
         $this->attributeRepository
@@ -211,6 +241,74 @@ class ProductValueConverterTest extends \PHPUnit_Framework_TestCase
         );
     }
 
+    public function testConvertMetricValue()
+    {
+        $this->attributeRepository
+            ->expects($this->any())
+            ->method('findOneBy')
+            ->with(array('code' => 'weight'))
+            ->will($this->returnValue($this->getAttributeMock('metric')));
+
+        $this->assertEquals(
+            array(
+                'values' => array(
+                    'weight' => array(
+                        'metric' => array(
+                            'data' => '60',
+                            'unit' => 'KILOGRAM',
+                        ),
+                    )
+                )
+            ),
+            $this->converter->convert(array('weight' => '60 KILOGRAM'))
+        );
+    }
+
+    public function testConvertEmptyMetricValue()
+    {
+        $this->attributeRepository
+            ->expects($this->any())
+            ->method('findOneBy')
+            ->with(array('code' => 'weight'))
+            ->will($this->returnValue($this->getAttributeMock('metric')));
+
+        $this->assertEquals(
+            array(
+                'values' => array(
+                    'weight' => array(
+                        'metric' => array(),
+                    )
+                )
+            ),
+            $this->converter->convert(array('weight' => ''))
+        );
+    }
+
+    /**
+     * @expectedException \InvalidArgumentException
+     */
+    public function testConvertMalformedMetric()
+    {
+        $this->attributeRepository
+            ->expects($this->any())
+            ->method('findOneBy')
+            ->with(array('code' => 'weight'))
+            ->will($this->returnValue($this->getAttributeMock('metric')));
+
+        $this->converter->convert(array('weight' => '60KILOGRAM'));
+    }
+
+    public function testConvertMedia()
+    {
+        $this->attributeRepository
+            ->expects($this->any())
+            ->method('findOneBy')
+            ->with(array('code' => 'image'))
+            ->will($this->returnValue($this->getAttributeMock('media')));
+
+        $this->assertEquals(array(), $this->converter->convert(array('image' => 'akeneo.jpg')));
+    }
+
     protected function getAttributeMock($backendType, $translatable = false, $scopable = false)
     {
         $attribute = $this->getMock('Pim\Bundle\CatalogBundle\Entity\ProductAttribute');
@@ -236,6 +334,21 @@ class ProductValueConverterTest extends \PHPUnit_Framework_TestCase
             ->getMockBuilder('Doctrine\ORM\EntityManager')
             ->disableOriginalConstructor()
             ->getMock();
+    }
+
+    protected function getCurrencyManagerMock()
+    {
+        $currencyManager = $this
+            ->getMockBuilder('Pim\Bundle\CatalogBundle\Manager\CurrencyManager')
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $currencyManager
+            ->expects($this->any())
+            ->method('getActiveCodes')
+            ->will($this->returnValue(array('EUR', 'USD')));
+
+        return $currencyManager;
     }
 
     protected function getRepositoryMock()

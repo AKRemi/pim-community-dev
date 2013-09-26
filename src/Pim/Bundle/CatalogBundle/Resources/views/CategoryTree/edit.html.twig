@@ -1,10 +1,12 @@
 {% extends 'PimCatalogBundle::layout.html.twig' %}
 
+{% oro_title_set({ params: { "%category.title%": form.vars.value.title } }) %}
+
 {% block head_script %}
     {{ parent() }}
     <script type="text/javascript">
         require(
-            ['jquery', 'pim/tree/manage', 'oro/navigation', 'jquery.sidebarize', 'bootstrap.tooltip'],
+            ['jquery', 'pim/tree/manage', 'oro/navigation', 'jquery.sidebarize', 'bootstrap-tooltip'],
             function($, TreeManage, Navigation){
                 'use strict';
                 $(function() {
@@ -12,7 +14,7 @@
                         'href': '{{ path("pim_catalog_categorytree_create") }}',
                         'data-toggle': 'tooltip',
                         'data-placement': 'right',
-                        'data-original-title': '{{ "Create a new tree"|trans }}'
+                        'data-original-title': '{{ "btn.create.tree"|trans|capitalize }}'
                     }).html(
                         $('<i>', { 'class': 'icon-plus-sign' })
                     );

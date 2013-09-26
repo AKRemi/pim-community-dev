@@ -9,11 +9,15 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Validator\ValidatorInterface;
+use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Form\Form;
 use Symfony\Component\HttpFoundation\Response;
+
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
+
 use Oro\Bundle\UserBundle\Annotation\Acl;
 use Oro\Bundle\GridBundle\Renderer\GridRenderer;
+
 use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
 use Pim\Bundle\CatalogBundle\Form\Handler\AttributeGroupHandler;
 use Pim\Bundle\CatalogBundle\Model\AvailableProductAttributes;
@@ -66,6 +70,7 @@ class AttributeGroupController extends AbstractDoctrineController
      * @param SecurityContextInterface $securityContext
      * @param FormFactoryInterface     $formFactory
      * @param ValidatorInterface       $validator
+     * @param TranslatorInterface      $translator
      * @param RegistryInterface        $doctrine
      * @param GridRenderer             $gridRenderer
      * @param DatagridWorkerInterface  $dataGridWorker
@@ -79,13 +84,23 @@ class AttributeGroupController extends AbstractDoctrineController
         SecurityContextInterface $securityContext,
         FormFactoryInterface $formFactory,
         ValidatorInterface $validator,
+        TranslatorInterface $translator,
         RegistryInterface $doctrine,
         GridRenderer $gridRenderer,
         DatagridWorkerInterface $dataGridWorker,
         AttributeGroupHandler $formHandler,
         Form $form
     ) {
-        parent::__construct($request, $templating, $router, $securityContext, $formFactory, $validator, $doctrine);
+        parent::__construct(
+            $request,
+            $templating,
+            $router,
+            $securityContext,
+            $formFactory,
+            $validator,
+            $translator,
+            $doctrine
+        );
 
         $this->gridRenderer   = $gridRenderer;
         $this->dataGridWorker = $dataGridWorker;
@@ -110,7 +125,7 @@ class AttributeGroupController extends AbstractDoctrineController
         $groups = $this->getRepository('PimCatalogBundle:AttributeGroup')->getIdToNameOrderedBySortOrder();
 
         if ($this->formHandler->process($group)) {
-            $this->addFlash('success', 'Attribute group successfully created');
+            $this->addFlash('success', 'flash.attribute group.created');
 
             return $this->redirectToRoute('pim_catalog_attributegroup_edit', array('id' => $group->getId()));
         }
@@ -153,7 +168,7 @@ class AttributeGroupController extends AbstractDoctrineController
         }
 
         if ($this->formHandler->process($group)) {
-            $this->addFlash('success', 'Attribute group successfully saved');
+            $this->addFlash('success', 'flash.attribute group.updated');
 
             return $this->redirectToRoute('pim_catalog_attributegroup_edit', array('id' => $group->getId()));
         }
@@ -223,8 +238,6 @@ class AttributeGroupController extends AbstractDoctrineController
         $this->getManager()->remove($group);
         $this->getManager()->flush();
 
-        $this->addFlash('success', 'Attribute group successfully removed');
-
         if ($request->get('_redirectBack')) {
             $referer = $request->headers->get('referer');
             if ($referer) {
@@ -232,7 +245,11 @@ class AttributeGroupController extends AbstractDoctrineController
             }
         }
 
-        return $this->redirectToRoute('pim_catalog_attributegroup_create');
+        if ($request->isXmlHttpRequest()) {
+            return new Response('', 204);
+        } else {
+            return $this->redirectToRoute('pim_catalog_attributegroup_create');
+        }
     }
 
     /**
@@ -288,7 +305,7 @@ class AttributeGroupController extends AbstractDoctrineController
 
         $this->getManager()->flush();
 
-        $this->addFlash('success', 'Attribute successfully added to the group');
+        $this->addFlash('success', 'flash.attribute group.attributes added');
 
         return $this->redirectToRoute('pim_catalog_attributegroup_edit', array('id' => $group->getId()));
     }
@@ -321,10 +338,11 @@ class AttributeGroupController extends AbstractDoctrineController
         $group->removeAttribute($attribute);
         $this->getManager()->flush();
 
-        $this->addFlash('success', 'Attribute successfully removed from the group');
-
-        return $this->redirectToRoute('pim_catalog_attributegroup_edit', array('id' => $group->getId()));
-
+        if ($this->getRequest()->isXmlHttpRequest()) {
+            return new Response('', 204);
+        } else {
+            return $this->redirectToRoute('pim_catalog_attributegroup_edit', array('id' => $group->getId()));
+        }
     }
 
     /**

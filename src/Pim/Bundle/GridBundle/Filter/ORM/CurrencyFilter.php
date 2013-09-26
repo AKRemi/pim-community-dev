@@ -77,16 +77,19 @@ class CurrencyFilter extends NumberFilter
      */
     public function getRenderSettings()
     {
+        $dataType = $this->getOption('data_type');
+
         list($formType, $formOptions) = parent::getRenderSettings();
 
-        $dataType = $this->getOption('data_type', FieldDescriptionInterface::TYPE_DECIMAL);
         switch ($dataType) {
+            case FieldDescriptionInterface::TYPE_INTEGER:
+                $formOptions['data_type'] = NumberFilterType::DATA_INTEGER;
+                break;
             case FieldDescriptionInterface::TYPE_DECIMAL:
+            case FieldDescriptionInterface::TYPE_PERCENT:
+            default:
                 $formOptions['data_type'] = NumberFilterType::DATA_DECIMAL;
                 break;
-            case FieldDescriptionInterface::TYPE_INTEGER:
-            default:
-                $formOptions['data_type'] = NumberFilterType::DATA_INTEGER;
         }
 
         return array($formType, $formOptions);

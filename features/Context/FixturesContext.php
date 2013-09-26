@@ -2,25 +2,26 @@
 
 namespace Context;
 
-use Doctrine\Common\Util\Inflector;
 use Doctrine\Common\Collections\ArrayCollection;
-use Behat\MinkExtension\Context\RawMinkContext;
-use Behat\Gherkin\Node\TableNode;
-use Oro\Bundle\UserBundle\Entity\User;
-use Oro\Bundle\UserBundle\Entity\Role;
-use Oro\Bundle\UserBundle\Entity\Acl;
-use Oro\Bundle\UserBundle\Entity\UserApi;
-use Oro\Bundle\DataAuditBundle\Entity\Audit;
+use Doctrine\Common\Util\Inflector;
 use Oro\Bundle\BatchBundle\Entity\JobInstance;
+use Oro\Bundle\DataAuditBundle\Entity\Audit;
+use Oro\Bundle\UserBundle\Entity\Acl;
+use Oro\Bundle\UserBundle\Entity\Role;
+use Oro\Bundle\UserBundle\Entity\User;
+use Oro\Bundle\UserBundle\Entity\UserApi;
 use Pim\Bundle\CatalogBundle\Entity\AttributeGroup;
+use Pim\Bundle\CatalogBundle\Entity\AttributeOption;
 use Pim\Bundle\CatalogBundle\Entity\AttributeRequirement;
+use Pim\Bundle\CatalogBundle\Entity\Category;
+use Pim\Bundle\CatalogBundle\Entity\Channel;
 use Pim\Bundle\CatalogBundle\Entity\Family;
 use Pim\Bundle\CatalogBundle\Entity\FamilyTranslation;
-use Pim\Bundle\CatalogBundle\Entity\ProductAttribute;
-use Pim\Bundle\CatalogBundle\Entity\Category;
-use Pim\Bundle\CatalogBundle\Entity\ProductPrice;
 use Pim\Bundle\CatalogBundle\Entity\Locale;
-use Pim\Bundle\CatalogBundle\Entity\Channel;
+use Pim\Bundle\CatalogBundle\Entity\ProductAttribute;
+use Pim\Bundle\CatalogBundle\Entity\ProductPrice;
+use Behat\Gherkin\Node\TableNode;
+use Behat\MinkExtension\Context\RawMinkContext;
 
 /**
  * A context for creating entities
@@ -43,14 +44,15 @@ class FixturesContext extends RawMinkContext
     );
 
     private $attributeTypes = array(
-        'text'       => 'pim_catalog_text',
-        'number'     => 'pim_catalog_number',
-        'textarea'   => 'pim_catalog_textarea',
-        'identifier' => 'pim_catalog_identifier',
-        'metric'     => 'pim_catalog_metric',
-        'prices'     => 'pim_catalog_price_collection',
-        'image'      => 'pim_catalog_image',
-        'file'       => 'pim_catalog_file',
+        'text'        => 'pim_catalog_text',
+        'number'      => 'pim_catalog_number',
+        'textarea'    => 'pim_catalog_textarea',
+        'identifier'  => 'pim_catalog_identifier',
+        'metric'      => 'pim_catalog_metric',
+        'prices'      => 'pim_catalog_price_collection',
+        'image'       => 'pim_catalog_image',
+        'file'        => 'pim_catalog_file',
+        'multiselect' => 'pim_catalog_multiselect',
     );
 
     /**
@@ -68,8 +70,9 @@ class FixturesContext extends RawMinkContext
      */
     public function resetChannels()
     {
+        $tree = $this->createTree('default');
         foreach ($this->channels as $code => $locales) {
-            $this->createChannel($code, $locales);
+            $this->createChannel($code, $locales, $tree);
         }
 
         $this->flush();
@@ -702,6 +705,141 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
+     * @param string $attribute
+     * @param string $options
+     *
+     * @Given /^the following "([^"]*)" attribute options: (.*)$/
+     */
+    public function theFollowingAttributeOptions($attribute, $options)
+    {
+        $attribute = $this->getAttribute(strtolower($attribute));
+        foreach ($this->listToArray($options) as $option) {
+            $attribute->addOption($this->createOption($option));
+        }
+
+        $this->flush();
+    }
+
+    /**
+     * @param string $lang
+     * @param string $attribute
+     * @param string $identifier
+     * @param string $value
+     *
+     * @Given /^the (\w+) (\w+) of (\w+) should be "([^"]*)"$/
+     */
+    public function theOfShouldBe($lang, $attribute, $identifier, $value)
+    {
+        $productValue = $this->getProductValue($identifier, strtolower($attribute), $this->locales[$lang]);
+
+        assertEquals($value, $productValue->getData());
+    }
+
+    /**
+     * @param string    $attribute
+     * @param string    $products
+     * @param TableNode $table
+     *
+     * @Given /^the prices "([^"]*)" of products (.*) should be:$/
+     */
+    public function thePricesOfProductsShouldBe($attribute, $products, TableNode $table)
+    {
+        foreach ($this->listToArray($products) as $identifier) {
+            $productValue = $this->getProductValue($identifier, strtolower($attribute));
+
+            foreach ($table->getHash() as $price) {
+                assertEquals($price['amount'], $productValue->getPrice($price['currency'])->getData());
+            }
+        }
+    }
+
+    /**
+     * @param string    $attribute
+     * @param string    $products
+     * @param TableNode $table
+     *
+     * @return null
+     * @Given /^the options "([^"]*)" of products (.*) should be:$/
+     */
+    public function theOptionsOfProductsShouldBe($attribute, $products, TableNode $table)
+    {
+        foreach ($this->listToArray($products) as $identifier) {
+            $productValue = $this->getProductValue($identifier, strtolower($attribute));
+            $options = $productValue->getOptions();
+            $optionCodes = $options->map(
+                function ($option) {
+                    return $option->getCode();
+                }
+            );
+
+            assertEquals(count($table->getHash()), $options->count());
+            foreach ($table->getHash() as $data) {
+                assertContains($data['value'], $optionCodes);
+            }
+        }
+    }
+
+    /**
+     * @param string $attribute
+     * @param string $products
+     * @param string $filename
+     *
+     * @Given /^the file "([^"]*)" of products (.*) should be "([^"]*)"$/
+     */
+    public function theFileOfShouldBe($attribute, $products, $filename)
+    {
+        foreach ($this->listToArray($products) as $identifier) {
+            $productValue = $this->getProductValue($identifier, strtolower($attribute));
+            assertEquals($filename, $productValue->getMedia()->getOriginalFilename());
+        }
+    }
+
+    /**
+     * @param string $attribute
+     * @param string $products
+     * @param string $data
+     *
+     * @Given /^the metric "([^"]*)" of products (.*) should be "([^"]*)"$/
+     */
+    public function theMetricOfProductsShouldBe($attribute, $products, $data)
+    {
+        foreach ($this->listToArray($products) as $identifier) {
+            $productValue = $this->getProductValue($identifier, strtolower($attribute));
+            assertEquals($data, $productValue->getMetric()->getData());
+        }
+    }
+
+    /**
+     * @param string $identifier
+     * @param string $attribute
+     * @param string $locale
+     * @param string $scope
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return ProductValue
+     */
+    private function getProductValue($identifier, $attribute, $locale = null, $scope = null)
+    {
+        $product = $this->getProductManager()->findByIdentifier($identifier);
+        if (!$product) {
+            throw new \InvalidArgumentException(
+                sprintf('Could not find product with identifier "%s"', $identifier)
+            );
+        }
+
+        $productValue = $product->getValue($attribute, $locale, $scope);
+        if (!$productValue) {
+            throw new \InvalidArgumentException(
+                sprintf('Could not find product value for attribute "%s" in locale "%s"', $attribute, $lang)
+            );
+        }
+        $this->getEntityManager()->refresh($productValue);
+
+        return $productValue;
+    }
+
+    /**
      * @param string $username
      *
      * @return User
@@ -860,7 +998,17 @@ class FixturesContext extends RawMinkContext
      */
     private function getAttributeType($type)
     {
-        return isset($this->attributeTypes[$type]) ? $this->attributeTypes[$type] : null;
+        if (!isset($this->attributeTypes[$type])) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Attribute type "%s" is not defined. Please add it in the %s::$attributeTypes property',
+                    $type,
+                    get_class($this)
+                )
+            );
+        }
+
+        return $this->attributeTypes[$type];
     }
 
     /**
@@ -921,8 +1069,6 @@ class FixturesContext extends RawMinkContext
 
     /**
      * @param string $code
-     *
-     * @return Locale
      */
     private function createLocale($code)
     {
@@ -933,16 +1079,30 @@ class FixturesContext extends RawMinkContext
     }
 
     /**
+     * @param string $code
+     *
+     * @return Category
+     */
+    private function createTree($code)
+    {
+        $tree = new Category();
+        $tree->setCode($code);
+        $this->persist($tree);
+
+        return $tree;
+    }
+
+    /**
      * @param string       $code
      * @param array:string $locales
-     *
-     * @return Channel
+     * @param Category     $tree
      */
-    private function createChannel($code, $locales)
+    private function createChannel($code, $locales, $tree = null)
     {
         $channel = new Channel;
         $channel->setCode($code);
         $channel->setName(ucfirst($code));
+        $channel->setCategory($tree);
 
         foreach ($locales as $localeCode) {
             $channel->addLocale($this->getLocale($localeCode));
@@ -1203,6 +1363,21 @@ class FixturesContext extends RawMinkContext
         $this->persist($acl);
 
         return $acl;
+    }
+
+    /**
+     * Create an attribute option entity
+     *
+     * @param string $code
+     *
+     * @return AttributeOption
+     */
+    private function createOption($code)
+    {
+        $option = new AttributeOption();
+        $option->setCode($code);
+
+        return $option;
     }
 
     /**

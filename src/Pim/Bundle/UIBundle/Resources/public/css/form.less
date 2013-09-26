@@ -14,6 +14,7 @@ form.form-signin {
     }
     h2.title {
       font-size: 20px;
+      line-height: 40px;
       text-align: center;
     }
   }
@@ -50,6 +51,12 @@ form.form-signin {
   div.alert {
     margin: 0;
     .border-radius(0);
+  }
+  &.form-reset {
+    max-width: 550px;
+    .add-on {
+      width: auto;
+    }
   }
 }
 
@@ -94,8 +101,8 @@ a.select2-choice {
 
 .form-row {
   button.btn {
-    height: 34px;
-    line-height: 34px;
+    height: 32px;
+    line-height: 32px;
   }
   .btn {
     margin-top: 8px;
@@ -215,6 +222,10 @@ th label {
   background-color: @backgroundColor-white;
 }
 
+i.remove-attribute {
+  cursor: pointer;
+}
+
 /* bootstrapSwitch */
 .has-switch {
   margin-right: 3px;
@@ -235,14 +246,27 @@ div.btn-group > .has-switch {
   display: block;
 }
 
+.select2-container.select2-container-disabled .select2-choice {
+  border: none;
+}
 .select2-container.input-large:not(.jstree-tree-select) {
   width: 250px!important;
 }
-.select2-container.input-inline {
-  width: 150px!important;
+.select2-container.input-medium {
+  width: 200px!important;
 }
 .select2-container-multi.select2-container-active .select2-choices {
   border: none;
+}
+.select2-allowclear abbr.select2-search-choice-close,
+.select2-container-multi .select2-search-choice-close {
+  font-family: FontAwesome;
+  font-size: 12px;
+  line-height: 12px;
+  color: @textColor + #333;
+  &:before {
+    content: "\f00d";
+  }
 }
 
 #attribute-buttons {
@@ -517,6 +541,7 @@ table i {
 /* Product edit form - common */
 
 .classify, .product-edit {
+  margin-bottom: 0;
   .nav-list {
     padding-right: 0;
     padding-left: 0;
@@ -549,6 +574,10 @@ table i {
   .modal-header h3 {
     background-color: @color-purple_light;
   }
+}
+
+#edit-family {
+  cursor: pointer;
 }
 
 /* Product edit form - attributes tab */
@@ -693,7 +722,24 @@ table i {
   }
 }
 
-.navbar-extra {padding: 10px 7px 10px 12px;}
+// ORO page titles
+h1 {
+  font-size: 18px;
+  font-weight: normal;
+  line-height: 33px;
+  color: #999;
+}
+.page-title {
+  padding: 10px 7px 10px 12px;
+  h1 {
+    margin: 0;
+    line-height: 33px;
+  }
+}
+
+.navbar-extra {
+  padding: 10px 7px 10px 12px;
+}
 .navbar-content {
   line-height: 18px;
   .sub-title {
@@ -855,11 +901,13 @@ div.dropdown-menu.channel {
   min-width: 210px;
 }
 
-.form-horizontal .tab-content {
-  min-height: 300px;
-  .tab-pane {
-    min-height: 300px;
-  }
+code {
+  color: @textColor;
+}
+
+.popover-title {
+  padding-left: 14px;
+  font-size: 12px;
 }
 
 #locale-switcher {
@@ -894,6 +942,7 @@ div.dropdown-menu.channel {
       span.title {
         float: none;
         margin: 0 10px;
+        padding-right: 20px;
         font-size: 12px;
         font-weight: bold;
       }
@@ -958,9 +1007,9 @@ button.pimmultiselect {
   height: @buttonHeight;
   padding: 0 10px;
   line-height: @buttonHeight;
-  color: @textColor;
+  color: @textColor + #222;
   &:hover {
-    color: @textColor;
+    color: @textColor + #222;
   }
 }
 .pimmultiselect.ui-multiselect-menu {
@@ -1008,6 +1057,9 @@ button.pimmultiselect {
       margin: 5px;
     }
   }
+}
+.ui-multiselect-optgroup-label a:hover {
+  color: @textColor;
 }
 
 ul.medias label.remove-media {
@@ -1073,8 +1125,17 @@ table#progress-table {
       text-align: center;
     }
     span.progress-info {
+      padding: 5px;
       color: #5e8dcb;
+      cursor: default;
     }
+  }
+}
+
+.table-bordered.groups {
+  border-left: 1px solid #ddd;
+  td, th {
+    border-left: 0;
   }
 }
 

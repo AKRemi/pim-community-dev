@@ -47,8 +47,6 @@ parameters:
     pim_catalog.form.type.currency.class:    Pim\Bundle\CatalogBundle\Form\Type\CurrencyType
 
     pim_catalog.manager.locale.class:        Pim\Bundle\CatalogBundle\Manager\LocaleManager
-    pim_catalog.form.handler.locale.class:   Pim\Bundle\CatalogBundle\Form\Handler\LocaleHandler
-    pim_catalog.form.type.locale.class:      Pim\Bundle\CatalogBundle\Form\Type\LocaleType
 
     pim_catalog.manager.channel.class:       Pim\Bundle\CatalogBundle\Manager\ChannelManager
     pim_catalog.form.handler.channel.class:  Pim\Bundle\CatalogBundle\Form\Handler\ChannelHandler
@@ -64,3 +62,4 @@ parameters:
     pim_catalog.mass_edit_action.change_status.class:          Pim\Bundle\CatalogBundle\MassEditAction\ChangeStatus
     pim_catalog.mass_edit_action.edit_common_attributes.class: Pim\Bundle\CatalogBundle\MassEditAction\EditCommonAttributes
     pim_catalog.mass_edit_action.classify.class:               Pim\Bundle\CatalogBundle\MassEditAction\Classify
+    pim_catalog.mass_edit_action.change_family.class:          Pim\Bundle\CatalogBundle\MassEditAction\ChangeFamily

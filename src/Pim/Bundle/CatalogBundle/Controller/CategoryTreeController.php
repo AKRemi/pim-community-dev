@@ -12,16 +12,22 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\Bridge\Doctrine\RegistryInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Validator\ValidatorInterface;
+use Symfony\Component\Translation\TranslatorInterface;
+
 use Doctrine\Common\Collections\ArrayCollection;
+
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
+
 use Oro\Bundle\GridBundle\Renderer\GridRenderer;
 use Oro\Bundle\UserBundle\Annotation\Acl;
+
 use Pim\Bundle\CatalogBundle\AbstractController\AbstractDoctrineController;
 use Pim\Bundle\CatalogBundle\Datagrid\DatagridWorkerInterface;
 use Pim\Bundle\CatalogBundle\Manager\CategoryManager;
 use Pim\Bundle\CatalogBundle\Form\Type\CategoryType;
 use Pim\Bundle\CatalogBundle\Helper\CategoryHelper;
 use Pim\Bundle\CatalogBundle\Entity\Category;
+use Pim\Bundle\CatalogBundle\Exception\DeleteException;
 
 /**
  * Category Tree Controller
@@ -68,6 +74,7 @@ class CategoryTreeController extends AbstractDoctrineController
      * @param SecurityContextInterface $securityContext
      * @param FormFactoryInterface     $formFactory
      * @param ValidatorInterface       $validator
+     * @param TranslatorInterface      $translator
      * @param RegistryInterface        $doctrine
      * @param GridRenderer             $gridRenderer
      * @param DatagridWorkerInterface  $dataGridWorker
@@ -81,13 +88,23 @@ class CategoryTreeController extends AbstractDoctrineController
         SecurityContextInterface $securityContext,
         FormFactoryInterface $formFactory,
         ValidatorInterface $validator,
+        TranslatorInterface $translator,
         RegistryInterface $doctrine,
         GridRenderer $gridRenderer,
         DatagridWorkerInterface $dataGridWorker,
         CategoryManager $categoryManager,
         CategoryType $categoryType
     ) {
-        parent::__construct($request, $templating, $router, $securityContext, $formFactory, $validator, $doctrine);
+        parent::__construct(
+            $request,
+            $templating,
+            $router,
+            $securityContext,
+            $formFactory,
+            $validator,
+            $translator,
+            $doctrine
+        );
 
         $this->gridRenderer    = $gridRenderer;
         $this->dataGridWorker  = $dataGridWorker;
@@ -133,6 +150,7 @@ class CategoryTreeController extends AbstractDoctrineController
     /**
      * Move a node
      * @param Request $request
+     *
      * @Acl(
      *      id="pim_catalog_category_move",
      *      name="Move category",
@@ -287,10 +305,7 @@ class CategoryTreeController extends AbstractDoctrineController
                 $manager->persist($category);
                 $manager->flush();
 
-                $this->addFlash(
-                    'success',
-                    sprintf('%s successfully created.', $category->getParent() ? 'Category' : 'Tree')
-                );
+                $this->addFlash('success', sprintf('flash.%s.created', $category->getParent() ? 'category' : 'tree'));
 
                 return $this->redirectToRoute('pim_catalog_categorytree_edit', array('id' => $category->getId()));
             }
@@ -342,10 +357,7 @@ class CategoryTreeController extends AbstractDoctrineController
                 $manager->persist($category);
                 $manager->flush();
 
-                $this->addFlash(
-                    'success',
-                    sprintf('%s successfully updated.', $category->getParent() ? 'Category' : 'Tree')
-                );
+                $this->addFlash('success', sprintf('flash.%s.updated', $category->getParent() ? 'category' : 'tree'));
             }
         }
 
@@ -362,6 +374,7 @@ class CategoryTreeController extends AbstractDoctrineController
      * Remove category tree
      *
      * @param Category $category
+     *
      * @Acl(
      *      id="pim_catalog_category_remove",
      *      name="Remove a category",
@@ -375,12 +388,17 @@ class CategoryTreeController extends AbstractDoctrineController
         $parent = $category->getParent();
         $params = ($parent !== null) ? array('node' => $parent->getId()) : array();
 
+        if (count($category->getChannels())) {
+            throw new DeleteException($this->getTranslator()->trans('flash.tree.not removable'));
+        }
         $this->categoryManager->remove($category);
         $this->categoryManager->getStorageManager()->flush();
 
-        $this->addFlash('success', 'Category successfully removed');
-
-        return $this->redirectToRoute('pim_catalog_categorytree_create', $params);
+        if ($this->getRequest()->isXmlHttpRequest()) {
+            return new Response('', 204);
+        } else {
+            return $this->redirectToRoute('pim_catalog_categorytree_create', $params);
+        }
     }
 
     /**

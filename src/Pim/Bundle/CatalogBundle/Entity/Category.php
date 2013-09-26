@@ -112,6 +112,16 @@ class Category extends AbstractSegment implements CategoryInterface, Translatabl
     protected $translations;
 
     /**
+     * @var ArrayCollection $channels
+     *
+     * @ORM\OneToMany(
+     *     targetEntity="Pim\Bundle\CatalogBundle\Entity\Channel",
+     *     mappedBy="category"
+     * )
+     */
+    protected $channels;
+
+    /**
      * @var integer $version
      *
      * @ORM\Column(name="version", type="integer")
@@ -128,6 +138,7 @@ class Category extends AbstractSegment implements CategoryInterface, Translatabl
 
         $this->products     = new ArrayCollection();
         $this->translations = new ArrayCollection();
+        $this->channels     = new ArrayCollection();
     }
 
     /**
@@ -328,6 +339,16 @@ class Category extends AbstractSegment implements CategoryInterface, Translatabl
         $this->getTranslation()->setTitle($title);
 
         return $this;
+    }
+
+    /**
+     * Returns the channels linked to the category
+     *
+     * @return ArrayCollection
+     */
+    public function getChannels()
+    {
+        return $this->channels;
     }
 
     /**

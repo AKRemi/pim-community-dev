@@ -54,6 +54,62 @@ class DataGridContext extends RawMinkContext implements PageObjectAwareInterface
     }
 
     /**
+     * @param string $action
+     * @param string $value
+     * @param string $currency
+     *
+     * @When /^I filter per price (>|>=|=|<|<=) "([^"]*)" and currency "([^"]*)"$/
+     */
+    public function iFilterPerPrice($action, $value, $currency)
+    {
+        $this->getPage('Product index')->filterPerPrice($action, $value, $currency);
+        $this->wait();
+    }
+
+    /**
+     * @param string $code
+     *
+     * @Given /^I filter per category "([^"]*)"$/
+     */
+    public function iFilterPerCategory($code)
+    {
+        $category = $this->getWebUserContext()->getCategory($code);
+        $this->getPage('Product index')->clickCategoryFilterLink($category);
+        $this->wait();
+    }
+
+    /**
+     * @Given /^I filter per unclassified category$/
+     */
+    public function iFilterPerUnclassifiedCategory()
+    {
+        $this->getPage('Product index')->clickUnclassifiedCategoryFilterLink();
+        $this->wait();
+    }
+
+    /**
+     * @param string $code
+     *
+     * @Given /^I filter per family ([^"]*)$/
+     */
+    public function iFilterPerFamily($code)
+    {
+        $this->getPage('Product index')->filterPerFamily($code);
+        $this->wait();
+    }
+
+    /**
+     * @param string $code
+     *
+     * @Given /^I filter per channel ([^"]*)$/
+     */
+    public function iFilterPerChannel($code)
+    {
+        $this->getPage('Product index')->filterPerChannel($code);
+        $this->wait();
+    }
+
+    /**
      * @param string $column
      * @param string $row
      * @param string $expectation
@@ -141,7 +197,7 @@ class DataGridContext extends RawMinkContext implements PageObjectAwareInterface
         $columns = $this->getMainContext()->listToArray($columns);
 
         $expectedColumns = count($columns);
-        $countColumns    = $this->datagrid->countColumns() - 1;
+        $countColumns    = $this->datagrid->countColumns();
         if ($expectedColumns !== $countColumns) {
             throw $this->createExpectationException(
                 sprintf('Expected %d columns but contains %d', $expectedColumns, $countColumns)
@@ -201,11 +257,41 @@ class DataGridContext extends RawMinkContext implements PageObjectAwareInterface
             if ($this->datagrid->isSortedColumn($columnName)) {
                 $this->sortByColumn($columnName);
             } else {
+                // get the actual sorted columns
+                $sortedColumns = $this->datagrid->getSortedColumns();
+
                 // if we ask sorting by descending we must sort twice
                 if ($order === 'descending') {
                     $this->sortByColumn($columnName);
                 }
                 $this->sortByColumn($columnName);
+
+                // And we must remove the default sorted column
+                foreach ($sortedColumns as $column) {
+                    $this->removeSortOnColumn($column);
+                    $this->wait();
+                }
+            }
+        }
+    }
+
+    /**
+     * Remove sort on a column with a loop but using a threshold to prevent
+     * against infinite loop
+     *
+     * @param string $column
+     *
+     * @return null
+     */
+    private function removeSortOnColumn($column)
+    {
+        $threshold = 0;
+        while ($this->datagrid->isSortedColumn($column)) {
+            $this->datagrid->getColumnSorter($column)->click();
+            $this->wait();
+
+            if ($threshold++ === 3) {
+                return;
             }
         }
     }
@@ -381,5 +467,24 @@ class DataGridContext extends RawMinkContext implements PageObjectAwareInterface
     private function wait($time = 4000, $condition = 'document.readyState == "complete" && !$.active')
     {
         return $this->getMainContext()->wait($time, $condition);
+    }
+
+    /**
+     *
+     * @return \Behat\Behat\Context\ExtendedContextInterface
+     */
+    private function getWebUserContext()
+    {
+        return $this->getMainContext()->getSubcontext('webUser');
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return \SensioLabs\Behat\PageObjectExtension\PageObject\Page
+     */
+    public function getPage($name)
+    {
+        return $this->getWebUserContext()->getPage($name);
     }
 }

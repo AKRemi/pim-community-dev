@@ -1,15 +1,17 @@
 /**
  * Extends Oro Navigation to automatically navigate to last filter status
- * 
+ *
  * @param {type} OroNavigation
  * @returns {unresolved}
  */
 define(
-    ['oro/navigation-orig', 'oro/app'],
-    function(OroNavigation, app) {
-        
+    ['oro/navigation-orig', 'oro/app', 'oro/messenger'],
+    function(OroNavigation, app, messenger) {
+
         var GRID_URL_REGEX = /enrich\/product\/(\?.*)?$/,
             QUERY_STRING_REGEX = /^[^\?]+\??/,
+            flashMessages = [],
+            parent = OroNavigation.prototype,
             instance,
             Navigation = OroNavigation.extend({
                 /**
@@ -24,25 +26,46 @@ define(
                     }
                     if (this.url.match(GRID_URL_REGEX)) {
                         var qs = this.url.replace(QUERY_STRING_REGEX, ''),
-                            args = qs ? app.unpackFromQueryString(qs) : {}
+                            args = qs ? app.unpackFromQueryString(qs) : {};
                         if (!encodedStateData && sessionStorage && sessionStorage.gridURL_products) {
-                            this.encodedStateData = sessionStorage.gridURL_products
+                            this.encodedStateData = sessionStorage.gridURL_products;
+                            this.skipAjaxCall = false;
                         } else if (!this.encodedStateData) {
-                            this.encodedStateData = ""
+                            this.encodedStateData = "";
                         }
                         if (args.dataLocale) {
                             this.encodedStateData += (this.encodedStateData ? '&' : '') +
                                     'dataLocale=' + args.dataLocale;
-                            sessionStorage.gridURL_products = this.encodedStateData
+                            sessionStorage.gridURL_products = this.encodedStateData;
+                            this.skipAjaxCall = false;
                         }
-                        this.skipAjaxCall = false
-                        this.navigate("url=" + this.url.split("?").shift() + "|g/" + this.encodedStateData, { trigger: false, replace: true});
+                        if (!this.skipAjaxCall) {
+                            this.navigate("url=" + this.url.split("?").shift() + "|g/" + this.encodedStateData, { trigger: false, replace: true});
+                        }
                     }
                     if (!this.skipAjaxCall) {
                         this.loadPage();
                     }
                     this.skipAjaxCall = false;
-                }});
+                },
+                /**
+                 * Adds a flash message to be displayed on next page load
+                 * @see oro/messenger
+                 */
+                addFlashMessage: function() {
+                    flashMessages.push(arguments);
+                },
+                /**
+                 * @inheritdoc
+                 */
+                afterRequest: function() {
+                    var message;
+                    parent.afterRequest.call(this)
+                    while (message = flashMessages.shift()) {
+                        messenger.notificationFlashMessage.apply(messenger, message)
+                    }
+                }
+            });
         /**
          * @inheritdoc
          */

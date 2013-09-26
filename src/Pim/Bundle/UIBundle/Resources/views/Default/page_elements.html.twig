@@ -1,46 +1,52 @@
-{% macro createBtn(text, url, id, attr) %}
+{% macro createBtn(entity, url, attr) %}
 {% spaceless %}
-    <a{% if id %} id="{{ id }}"{% endif %} class="btn btn-primary pull-right{% if attr.class is defined %} {{ attr.class }}{% endif %}" href="{{ url ? url : 'javascript:void(0);' }}" title="{{ text|trans }}"{% if attr %}{% for key, value in attr %}{% if key != 'class' %} {{ key }}="{{ value }}"{% endif %}{% endfor %}{% endif %}>{{ text|trans }}</a>
+    {% set title = ('btn.create.' ~ entity)|trans|capitalize %}
+    <a class="btn btn-primary pull-right{% if attr.class is defined %} {{ attr.class }}{% endif %}" href="{{ url ? url : 'javascript:void(0);' }}" title="{{ title }}"{% if attr %}{% for key, value in attr %}{% if key != 'class' %} {{ key }}="{{ value }}"{% endif %}{% endfor %}{% endif %}>{{ title }}</a>
 {% endspaceless %}
 {% endmacro %}
 
 {% macro submitBtn(text, icon) %}
 {% spaceless %}
-    {% set text = text ? text : 'Save' %}
-    <button type="submit" class="btn btn-primary" title="{{ text|trans }}">
+    {% set text = text|default('btn.save')|trans|capitalize %}
+    <button type="submit" class="btn btn-primary" title="{{ text }}">
         {% if icon %}
             <i class="icon-{{ icon }}"></i>
         {% endif %}
-        {{ text|trans }}
+        {{ text }}
     </button>
 {% endspaceless %}
 {% endmacro %}
 
 {% macro backLink(url, title) %}
 {% spaceless %}
-    {% set title = title ? title : 'Back to grid' %}
-    <a class="btn icons-holder back-link" href="{{ url }}" title="{{ title|trans }}"><i class="icon-chevron-left"></i></a>
+    {% set title = title|default('btn.to grid') %}
+    <a class="btn icons-holder back-link" href="{{ url }}" title="{{ title|trans|capitalize }}"><i class="icon-chevron-left"></i></a>
 {% endspaceless %}
 {% endmacro %}
 
-{% macro deleteLink(url, message, title) %}
-{% spaceless %}
-    {% set message = message ? message : 'Are you sure you want to delete this item?' %}
-    {% set title = title ? title : 'Delete confirmation' %}
-    <a class="btn icons-holder-text no-hash" href="javascript:void(0);" title="{{ 'Delete'|trans }}" data-dialog="confirm" data-title="{{ title|trans }}" data-message="{{ message|trans }}" data-url="{{ url }}" data-method="DELETE">
+{% macro deleteLinkAttributes(url, redirectUrl, message, title, successMessage) %}{% spaceless %}
+    {% set message = message|default('confirmation.remove.item') %}
+    {% set title = title|default('confirmation.delete'|trans) %}
+    {% set successMessage = successMessage|default('flash.entity.removed'|trans) %}
+    href="javascript:void(0);" data-dialog="confirm" data-title="{{ title }}" data-message="{{ message }}" data-url="{{ url }}" data-redirect-url="{{ redirectUrl }}" data-method="DELETE" data-error-message="{% trans %}The element could not be deleted{% endtrans %}" data-success-message="{{ successMessage }}"
+{% endspaceless %}{% endmacro %}
+
+
+{% macro deleteLink(url, redirectUrl, message, title, successMessage) %}{% spaceless %}
+    {% import _self as elements %}
+    <a class="btn icons-holder-text no-hash" title="{{ 'btn.delete'|trans|capitalize }}" {{elements.deleteLinkAttributes(url, redirectUrl, message, title, successMessage)}} >
         <i class="icon-trash"></i>
-        {{ 'Delete'|trans }}
+        {{ 'btn.delete'|trans|capitalize }}
     </a>
-{% endspaceless %}
-{% endmacro %}
+{% endspaceless %}{% endmacro %}
 
 {% macro link(text, url, opts = {}) %}
 {% spaceless %}
     {% set title = opts.title is defined ? opts.title : text %}
     {% set icon = opts.icon is defined ? opts.icon : null %}
-    <a{% if opts.id is defined %} id="{{ opts.id }}"{% endif %} class="btn {{ opts.class is defined ? opts.class|join(' ') }}{% if text and icon %} icons-holder-text{% elseif icon %} icons-holder{% endif %}" href="{{ url ? url : 'javascript:void(0);' }}"{% if title %} title="{{ title|trans }}"{% endif %}{% if opts.attr is defined %}{% for key, value in opts.attr %} {{ key }}="{{ value }}"{% endfor %}{% endif %}>
+    <a{% if opts.id is defined %} id="{{ opts.id }}"{% endif %} class="btn {{ opts.class is defined ? opts.class|join(' ') }}{% if text and icon %} icons-holder-text{% elseif icon %} icons-holder{% endif %}" href="{{ url ? url : 'javascript:void(0);' }}"{% if title %} title="{{ title|trans|capitalize }}"{% endif %}{% if opts.attr is defined %}{% for key, value in opts.attr %} {{ key }}="{{ value }}"{% endfor %}{% endif %}>
         {% if icon %}<i class="icon-{{ icon }}"></i>{% endif %}
-        {{ text|trans }}
+        {{ text|trans|capitalize }}
     </a>
 {% endspaceless %}
 {% endmacro %}
@@ -55,7 +61,7 @@
             {% endif %}
             <div class="navbar-content pull-left">
                 <div class="navbar-title clearfix-oro">
-                    <div class="sub-title">{{ title }}</div>
+                    <div class="sub-title">{{ title|first|capitalize ~ title[1:] }}</div>
                     {% if subtitle is not empty %}
                         <span class="separator">/</span>
                         <div class="sub-title">{{ subtitle }}</div>

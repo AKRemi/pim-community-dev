@@ -6,14 +6,12 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
-use Oro\Bundle\DataAuditBundle\Entity\Audit;
 use Oro\Bundle\UserBundle\Entity\User;
 use Pim\Bundle\VersioningBundle\Entity\VersionableInterface;
 use Pim\Bundle\VersioningBundle\Entity\Version;
 use Pim\Bundle\VersioningBundle\Entity\Pending;
 use Pim\Bundle\VersioningBundle\Builder\VersionBuilder;
 use Pim\Bundle\VersioningBundle\Builder\AuditBuilder;
-use Pim\Bundle\CatalogBundle\Entity\Family;
 use Pim\Bundle\CatalogBundle\Model\ProductValueInterface;
 use Pim\Bundle\CatalogBundle\Entity\ProductPrice;
 use Pim\Bundle\TranslationBundle\Entity\AbstractTranslation;
@@ -191,15 +189,15 @@ class AddVersionListener implements EventSubscriber
         }
 
         foreach ($uow->getScheduledEntityDeletions() as $entity) {
-            $this->checkScheduledDeletion($em, $entity);
+            $this->checkScheduledDeletion($entity);
         }
 
         foreach ($uow->getScheduledCollectionDeletions() as $entity) {
-            $this->checkScheduledCollection($em, $entity);
+            $this->checkScheduledCollection($entity);
         }
 
         foreach ($uow->getScheduledCollectionUpdates() as $entity) {
-            $this->checkScheduledCollection($em, $entity);
+            $this->checkScheduledCollection($entity);
         }
     }
 
@@ -216,77 +214,74 @@ class AddVersionListener implements EventSubscriber
             if ($changeset and in_array('group', array_keys($changeset))) {
                 $groupChangeset = $changeset['group'];
                 if (isset($groupChangeset[0]) and $groupChangeset[0]) {
-                    $this->addPendingVersioning($em, $groupChangeset[0]);
+                    $this->addPendingVersioning($groupChangeset[0]);
                 }
                 if (isset($groupChangeset[1]) and $groupChangeset[1]) {
-                    $this->addPendingVersioning($em, $groupChangeset[1]);
+                    $this->addPendingVersioning($groupChangeset[1]);
                 }
             }
 
-        } elseif ($entity instanceof VersionableInterface) {
-            $this->addPendingVersioning($em, $entity);
+        }
+        if ($entity instanceof VersionableInterface) {
+            $this->addPendingVersioning($entity);
 
         } elseif ($entity instanceof ProductValueInterface) {
             $product = $entity->getEntity();
             if ($product) {
-                $this->addPendingVersioning($em, $product);
+                $this->addPendingVersioning($product);
             }
 
         } elseif ($entity instanceof ProductPrice) {
             $product = $entity->getValue()->getEntity();
-            $this->addPendingVersioning($em, $product);
+            $this->addPendingVersioning($product);
 
         } elseif ($entity instanceof AbstractTranslation) {
             $translatedEntity = $entity->getForeignKey();
             if ($translatedEntity instanceof VersionableInterface) {
-                $this->addPendingVersioning($em, $translatedEntity);
+                $this->addPendingVersioning($translatedEntity);
             }
 
         } elseif ($entity instanceof AttributeOption) {
             $attribute = $entity->getAttribute();
-            $this->addPendingVersioning($em, $attribute);
+            $this->addPendingVersioning($attribute);
 
         } elseif ($entity instanceof AttributeOptionValue) {
             $attribute = $entity->getOption()->getAttribute();
-            $this->addPendingVersioning($em, $attribute);
+            $this->addPendingVersioning($attribute);
         }
     }
 
     /**
      * Check if a related entity must be versioned due to entity deletion
      *
-     * @param EntityManager $em
-     * @param object        $entity
+     * @param object $entity
      */
-    public function checkScheduledDeletion($em, $entity)
+    public function checkScheduledDeletion($entity)
     {
         if ($entity instanceof AttributeOption) {
             $attribute = $entity->getAttribute();
-            $this->addPendingVersioning($em, $attribute);
+            $this->addPendingVersioning($attribute);
         }
     }
 
     /**
      * Check if an entity must be versioned due to collection changes
      *
-     * @param EntityManager $em
-     * @param object        $entity
+     * @param object $entity
      */
-    public function checkScheduledCollection($em, $entity)
+    public function checkScheduledCollection($entity)
     {
         if ($entity->getOwner() instanceof VersionableInterface) {
-            $this->addPendingVersioning($em, $entity->getOwner());
-
+            $this->addPendingVersioning($entity->getOwner());
         }
     }
 
     /**
      * Mark entity as to be versioned
      *
-     * @param EntityManager        $em
      * @param VersionableInterface $versionable
      */
-    protected function addPendingVersioning($em, VersionableInterface $versionable)
+    protected function addPendingVersioning(VersionableInterface $versionable)
     {
         $oid = spl_object_hash($versionable);
         if (!isset($this->versionableEntities[$oid]) and !in_array($oid, $this->versionedEntities)) {

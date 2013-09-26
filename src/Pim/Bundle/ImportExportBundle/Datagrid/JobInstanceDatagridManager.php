@@ -79,8 +79,7 @@ class JobInstanceDatagridManager extends DatagridManager
             'options'      => array(
                 'label'   => $this->translate('Edit'),
                 'icon'    => 'edit',
-                'link'    => 'edit_link',
-                'backUrl' => true
+                'link'    => 'edit_link'
             )
         );
 
@@ -102,8 +101,7 @@ class JobInstanceDatagridManager extends DatagridManager
             'options'      => array(
                 'label'   => $this->translate('Launch'),
                 'icon'    => 'play',
-                'link'    => 'show_link',
-                'backUrl' => true
+                'link'    => 'show_link'
             )
         );
 
@@ -174,7 +172,7 @@ class JobInstanceDatagridManager extends DatagridManager
             $jobs = array_merge($jobs, array_keys($registryJob));
         }
         $choices = array_unique($jobs);
-        $choices = array_combine($jobs, $jobs);
+        $choices = empty($choices) ? array() : array_combine($jobs, $jobs);
 
         // create field description
         $field = new FieldDescription();
@@ -218,7 +216,7 @@ class JobInstanceDatagridManager extends DatagridManager
     {
         // create choices
         $connectors = array_keys($this->getRegistryJobs());
-        $choices = array_combine($connectors, $connectors);
+        $choices = empty($connectors) ? array() : array_combine($connectors, $connectors);
 
         // create field description
         $field = new FieldDescription();

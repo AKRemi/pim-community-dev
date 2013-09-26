@@ -4,7 +4,7 @@ function(AbstractAction) {
     'use strict';
 
     /**
-     * Resets collection to initial state
+     * Resets collection to initial state (corrects buggy ORO implementation)
      *
      * @export  oro/datagrid/reset-collection-action
      * @class   oro.datagrid.ResetCollectionAction
@@ -38,8 +38,8 @@ function(AbstractAction) {
          */
         execute: function() {
             this.collection.initialState.filters = {}
-            this.collection.initialState.treeId = this.collection.state.treeId
-            this.collection.initialState.categoryId = this.collection.state.categoryId
+            this.collection.initialState.treeId = this.collection.state.treeId;
+            this.collection.initialState.categoryId = this.collection.state.categoryId;
             this.collection.updateState(this.collection.initialState);
             this.collection.fetch();
         }
