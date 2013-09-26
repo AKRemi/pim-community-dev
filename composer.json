@@ -29,7 +29,7 @@
         "behat/mink-browserkit-driver":  "*",
         "behat/mink-selenium2-driver":   "*",
         "behat/common-contexts": "*",
-        "sensiolabs/behat-page-object-extension": "*",
+        "sensiolabs/behat-page-object-extension": "v1.0.1",
         "kriswallsmith/buzz": ">=0.5"
     },
     "repositories": [
