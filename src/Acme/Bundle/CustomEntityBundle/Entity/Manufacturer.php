@@ -33,6 +33,13 @@ class Manufacturer
      * @ORM\Column(name="code", type="string", length=100)
      */
     protected $code;
+
+    /**
+     * @var string $name
+     *
+     * @ORM\Column(name="name", type="string", length=100)
+     */
+    protected $name;
     
 
     /**
@@ -72,6 +79,30 @@ class Manufacturer
     public function setCode($code)
     {
         $this->code = $code;
+
+        return $this;
+    }
+
+    /**
+     * Get name
+     *
+     * @return string
+     */
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    /**
+     * Set name
+     *
+     * @param string $name
+     *
+     * @return Manufacturer
+     */
+    public function setName($name)
+    {
+        $this->name = $name;
 
         return $this;
     }

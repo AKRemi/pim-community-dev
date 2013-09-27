@@ -1,5 +1,5 @@
 parameters:
-    acme_customentity.datagrid.manager.manufacturer.class:      Acme\Bundle\CustomEntity\Datagrid\ManufacturerDatagridManager
+    acme_customentity.datagrid.manager.manufacturer.class:      Acme\Bundle\CustomEntityBundle\Datagrid\ManufacturerDatagridManager
 
 services:
     acme_customentity.datagrid.manager.manufacturer:
